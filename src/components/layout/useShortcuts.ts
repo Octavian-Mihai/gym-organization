@@ -11,7 +11,7 @@ export function useShortcuts() {
       const s = useStore.getState();
       const mod = e.metaKey || e.ctrlKey;
       const k = e.key.toLowerCase();
-      if (mod && k === "z") { e.preventDefault(); e.shiftKey ? s.redo() : s.undo(); return; }
+      if (mod && k === "z") { e.preventDefault(); if (e.shiftKey) s.redo(); else s.undo(); return; }
       if (mod && k === "y") { e.preventDefault(); s.redo(); return; }
       if (mod && k === "s") { e.preventDefault(); s.saveCurrent(); return; }
       if (mod && k === "d") { e.preventDefault(); s.duplicateSelected(); return; }

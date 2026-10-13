@@ -1,6 +1,6 @@
 "use client";
 import { useMemo } from "react";
-import { validateScene } from "@/lib/geometry/validation";
+import { validateSceneCached } from "@/lib/geometry/validation";
 import { newId } from "@/lib/scene/ids";
 import type { Door, Room, WallId, Window as Win } from "@/lib/scene/types";
 import { updateRoom } from "@/lib/store/scene-ops";
@@ -16,7 +16,7 @@ export function RoomPanel() {
   const commit = useStore((s) => s.commit);
   const { room } = scene;
   const patch = (p: Partial<Room>) => commit((s) => updateRoom(s, p));
-  const outside = useMemo(() => validateScene(scene).filter((i) => i.kind === "outside" || i.kind === "ceiling"), [scene]);
+  const outside = useMemo(() => validateSceneCached(scene).filter((i) => i.kind === "outside" || i.kind === "ceiling"), [scene]);
 
   return (
     <div className="space-y-3 p-3 text-sm">

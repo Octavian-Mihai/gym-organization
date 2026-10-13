@@ -129,3 +129,11 @@ export function validateScene(scene: Scene): Issue[] {
 export function issuesFor(issues: Issue[], id: string) {
   return issues.filter((i) => i.objectIds.includes(id));
 }
+
+const issueCache = new WeakMap<object, Issue[]>();
+/** Memoized by scene identity so the 2D view, 3D view and panels share one computation per edit. */
+export function validateSceneCached(scene: Scene): Issue[] {
+  let r = issueCache.get(scene);
+  if (!r) { r = validateScene(scene); issueCache.set(scene, r); }
+  return r;
+}

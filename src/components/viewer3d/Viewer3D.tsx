@@ -9,8 +9,7 @@ import type { HoleSet, Material, Primitive } from "@/lib/equipment/types";
 import { clearanceObb, dimsOf, modelOf, worldPlacement } from "@/lib/geometry/world";
 import { rad } from "@/lib/geometry/rect";
 import { snapMove } from "@/lib/geometry/snap";
-import { validateScene, type Issue } from "@/lib/geometry/validation";
-import { getDef } from "@/lib/equipment/registry";
+import { validateSceneCached, type Issue } from "@/lib/geometry/validation";
 import type { EquipmentInstance, Opening, Room, Scene, WallId } from "@/lib/scene/types";
 import { useStore } from "@/lib/store/useStore";
 import { formatLength } from "@/lib/units";
@@ -165,9 +164,11 @@ function CameraRig() {
   const preset = useStore((s) => s.cameraPreset);
   const ortho = useStore((s) => s.ortho);
   const room = useStore((s) => s.scene.room);
-  const { camera, size } = useThree();
+  const cam = useThree((s) => s.camera);
+  const getState = useThree((s) => s.get);
   const controls = useThree((s) => s.controls) as unknown as OrbitControlsImpl | null;
   useEffect(() => {
+    const { camera, size } = getState();
     const cx = room.length / 2, cz = room.width / 2, d = Math.max(room.length, room.width) * 1.5;
     const target = new THREE.Vector3(cx, room.ceilingHeight * 0.3, cz);
     const spots = {
@@ -184,7 +185,7 @@ function CameraRig() {
     camera.lookAt(target);
     if (controls) { controls.target.copy(target); controls.update(); }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [preset.nonce, ortho, !!controls, camera]);
+  }, [preset.nonce, ortho, !!controls, cam]);
   return null;
 }
 
@@ -331,7 +332,7 @@ export function Viewer3D() {
   const selection = useStore((s) => s.selection);
   const unit = useStore((s) => s.settings.displayUnit);
   const showDims = useStore((s) => s.settings.showDimensions);
-  const issues = useMemo(() => validateScene(scene), [scene]);
+  const issues = useMemo(() => validateSceneCached(scene), [scene]);
   const labelsRef = useRef<Label[]>([]);
   const els = useRef(new Map<string, HTMLElement>());
   const { room } = scene;
@@ -351,7 +352,7 @@ export function Viewer3D() {
     for (const i of issues) if (i.at) out.push({ id: i.id, pos: [i.at.x, 60, i.at.y], kind: "issue", text: "!", issue: i });
     return out;
   }, [scene, selection, unit, showDims, issues, room]);
-  labelsRef.current = labels;
+  useEffect(() => { labelsRef.current = labels; }, [labels]);
 
   return (
     <div className="relative h-full w-full bg-gradient-to-b from-zinc-200 to-zinc-100 dark:from-zinc-900 dark:to-zinc-950">

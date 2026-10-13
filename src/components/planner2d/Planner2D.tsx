@@ -5,7 +5,7 @@ import { primitiveExtent } from "@/lib/equipment/model";
 import { clearanceObb, dimsOf, footprintObb, modelOf, worldPlacement } from "@/lib/geometry/world";
 import { obbAabb, obbCorners, rad, rotatePoint, type OBB } from "@/lib/geometry/rect";
 import { snapAngle, snapMove, type Guide } from "@/lib/geometry/snap";
-import { validateScene, type Issue } from "@/lib/geometry/validation";
+import { validateSceneCached, type Issue } from "@/lib/geometry/validation";
 import type { EquipmentInstance, Opening, Scene, WallId } from "@/lib/scene/types";
 import { resizePatch, updateConfig, updatePlacement, wallMount } from "@/lib/store/scene-ops";
 import { useStore } from "@/lib/store/useStore";
@@ -76,6 +76,21 @@ export function DoorSvg({ o, room }: { o: Opening; room: Scene["room"] }) {
   );
 }
 
+function Dim({ x1, y1, x2, y2, label, color = "#475569", k }: { x1: number; y1: number; x2: number; y2: number; label: string; color?: string; k: number }) {
+  const fs = 11 / k;
+  const mx = (x1 + x2) / 2, my = (y1 + y2) / 2;
+  const ang = (Math.atan2(y2 - y1, x2 - x1) * 180) / Math.PI;
+  const flip = ang > 90 || ang < -90;
+  return (
+    <g pointerEvents="none" style={{ userSelect: "none" }}>
+      <line x1={x1} y1={y1} x2={x2} y2={y2} stroke={color} strokeWidth={1} vectorEffect="non-scaling-stroke" />
+      <g transform={`translate(${mx} ${my}) rotate(${flip ? ang + 180 : ang})`}>
+        <text fontSize={fs} fill={color} textAnchor="middle" dy={-4 / k} stroke="white" strokeWidth={3 / k} paintOrder="stroke" fontFamily="ui-monospace, monospace">{label}</text>
+      </g>
+    </g>
+  );
+}
+
 type Drag =
   | { kind: "pan"; sx: number; sy: number; ox: number; oy: number }
   | { kind: "move"; start: { x: number; y: number }; startScene: Scene; ids: string[] }
@@ -99,7 +114,7 @@ export function Planner2D() {
   const [hover, setHover] = useState<string | null>(null);
   const fitted = useRef(false);
 
-  const issues = useMemo(() => validateScene(scene), [scene]);
+  const issues = useMemo(() => validateSceneCached(scene), [scene]);
   const issueIds = useMemo(() => new Set(issues.filter((i) => i.kind !== "clearance").flatMap((i) => i.objectIds)), [issues]);
   const room = scene.room;
   const unit = settings.displayUnit;
@@ -155,6 +170,7 @@ export function Planner2D() {
   useEffect(() => {
     if (!focusIssue) return;
     const iss = issues.find((i) => i.id === focusIssue);
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- reacting to an external UI request (store) to move the viewport
     if (iss?.at) setView((v) => ({ ...v, ox: size.w / 2 - iss.at!.x * v.k, oy: size.h / 2 - iss.at!.y * v.k }));
   }, [focusIssue, issues, size]);
 
@@ -293,24 +309,8 @@ export function Planner2D() {
   const selWorld = selInst ? worldPlacement(selInst, scene) : null;
   const selDims = selInst ? dimsOf(selInst) : null;
   const k = view.k;
-  const fs = 11 / k;
 
   const gridStep = useMemo(() => { let g = settings.gridSize; while (g * k < 7) g *= 2; return g; }, [settings.gridSize, k]);
-
-  const Dim = ({ x1, y1, x2, y2, label, color = "#475569", offset = 0 }: { x1: number; y1: number; x2: number; y2: number; label: string; color?: string; offset?: number }) => {
-    const mx = (x1 + x2) / 2, my = (y1 + y2) / 2;
-    const ang = (Math.atan2(y2 - y1, x2 - x1) * 180) / Math.PI;
-    const flip = ang > 90 || ang < -90;
-    return (
-      <g pointerEvents="none" style={{ userSelect: "none" }}>
-        <line x1={x1} y1={y1} x2={x2} y2={y2} stroke={color} strokeWidth={1} vectorEffect="non-scaling-stroke" />
-        <line x1={x1} y1={y1} x2={x1 + (y2 - y1 === 0 ? 0 : 6 / k)} y2={y1 + (x2 - x1 === 0 ? 0 : 6 / k)} stroke={color} strokeWidth={1} vectorEffect="non-scaling-stroke" opacity={0} />
-        <g transform={`translate(${mx} ${my}) rotate(${flip ? ang + 180 : ang}) translate(0 ${offset})`}>
-          <text fontSize={fs} fill={color} textAnchor="middle" dy={-4 / k} stroke="white" strokeWidth={3 / k} paintOrder="stroke" fontFamily="ui-monospace, monospace">{label}</text>
-        </g>
-      </g>
-    );
-  };
 
   const wallVisible = (w: WallId) => w;
   void wallVisible;
@@ -364,8 +364,8 @@ export function Planner2D() {
           {/* room dimensions */}
           {settings.showDimensions && (
             <>
-              <Dim x1={0} y1={-t - 28 / k} x2={room.length} y2={-t - 28 / k} label={formatLength(room.length, unit)} color="#1e293b" />
-              <Dim x1={-t - 28 / k} y1={room.width} x2={-t - 28 / k} y2={0} label={formatLength(room.width, unit)} color="#1e293b" />
+              <Dim x1={0} y1={-t - 28 / k} x2={room.length} y2={-t - 28 / k} label={formatLength(room.length, unit)} color="#1e293b" k={k} />
+              <Dim x1={-t - 28 / k} y1={room.width} x2={-t - 28 / k} y2={0} label={formatLength(room.width, unit)} color="#1e293b" k={k} />
             </>
           )}
 
@@ -376,12 +376,12 @@ export function Planner2D() {
             const dist = (a: number, b: number) => b - a;
             return (
               <g>
-                <Dim x1={bb.minX} y1={bb.maxY + 14 / k} x2={bb.maxX} y2={bb.maxY + 14 / k} label={formatLength(bb.maxX - bb.minX, unit)} color="#2563eb" />
-                <Dim x1={bb.maxX + 14 / k} y1={bb.maxY} x2={bb.maxX + 14 / k} y2={bb.minY} label={formatLength(bb.maxY - bb.minY, unit)} color="#2563eb" />
-                {bb.minX > 1 && <Dim x1={0} y1={cy} x2={bb.minX} y2={cy} label={formatLength(dist(0, bb.minX), unit)} color="#16a34a" />}
-                {room.length - bb.maxX > 1 && <Dim x1={bb.maxX} y1={cy} x2={room.length} y2={cy} label={formatLength(room.length - bb.maxX, unit)} color="#16a34a" />}
-                {bb.minY > 1 && <Dim x1={cx} y1={bb.minY} x2={cx} y2={0} label={formatLength(bb.minY, unit)} color="#16a34a" />}
-                {room.width - bb.maxY > 1 && <Dim x1={cx} y1={bb.maxY} x2={cx} y2={room.width} label={formatLength(room.width - bb.maxY, unit)} color="#16a34a" />}
+                <Dim x1={bb.minX} y1={bb.maxY + 14 / k} x2={bb.maxX} y2={bb.maxY + 14 / k} label={formatLength(bb.maxX - bb.minX, unit)} color="#2563eb" k={k} />
+                <Dim x1={bb.maxX + 14 / k} y1={bb.maxY} x2={bb.maxX + 14 / k} y2={bb.minY} label={formatLength(bb.maxY - bb.minY, unit)} color="#2563eb" k={k} />
+                {bb.minX > 1 && <Dim x1={0} y1={cy} x2={bb.minX} y2={cy} label={formatLength(dist(0, bb.minX), unit)} color="#16a34a" k={k} />}
+                {room.length - bb.maxX > 1 && <Dim x1={bb.maxX} y1={cy} x2={room.length} y2={cy} label={formatLength(room.length - bb.maxX, unit)} color="#16a34a" k={k} />}
+                {bb.minY > 1 && <Dim x1={cx} y1={bb.minY} x2={cx} y2={0} label={formatLength(bb.minY, unit)} color="#16a34a" k={k} />}
+                {room.width - bb.maxY > 1 && <Dim x1={cx} y1={bb.maxY} x2={cx} y2={room.width} label={formatLength(room.width - bb.maxY, unit)} color="#16a34a" k={k} />}
               </g>
             );
           })()}

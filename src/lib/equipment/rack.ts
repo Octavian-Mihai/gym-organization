@@ -299,7 +299,7 @@ export const rackDef: EquipmentDef<RackConfig> = {
   validate: validateRack,
   sanitize: sanitizeRack,
   build: buildRack,
-  defaultClearance: (c) => ({ enabled: false, front: fromInches(36), back: fromInches(6), left: fromInches(24), right: fromInches(24), label: "Rack entry & barbell loading" }),
+  defaultClearance: () => ({ enabled: false, front: fromInches(36), back: fromInches(6), left: fromInches(24), right: fromInches(24), label: "Rack entry & barbell loading" }),
   defaultName: (c) => (c.postCount === 6 ? "6-post rack" : "4-post rack"),
   defaultColor: "#1f2937",
 };

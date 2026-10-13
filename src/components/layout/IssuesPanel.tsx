@@ -1,13 +1,13 @@
 "use client";
 import { useMemo } from "react";
-import { validateScene } from "@/lib/geometry/validation";
+import { validateSceneCached } from "@/lib/geometry/validation";
 import { useStore } from "@/lib/store/useStore";
 
 const KIND_LABEL = { physical: "Physical intersection", clearance: "Insufficient clearance", outside: "Outside room", opening: "Door / window", ceiling: "Ceiling", "wall-mount": "Wall mount", obstacle: "Wall obstacle", "mounted-ok": "Mounted" } as const;
 
 export function IssuesPanel() {
   const scene = useStore((s) => s.scene);
-  const issues = useMemo(() => validateScene(scene), [scene]);
+  const issues = useMemo(() => validateSceneCached(scene), [scene]);
   const errors = issues.filter((i) => i.severity === "error").length;
   return (
     <details className="border-t border-zinc-200 dark:border-zinc-800" open={issues.length > 0}>

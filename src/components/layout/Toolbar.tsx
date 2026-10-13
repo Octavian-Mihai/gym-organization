@@ -39,7 +39,7 @@ export function Toolbar() {
   const fileRef = useRef<HTMLInputElement>(null);
   const [editing, setEditing] = useState(false);
   const [nameDraft, setNameDraft] = useState(s.name);
-  useEffect(() => setNameDraft(s.name), [s.name]);
+  const startRename = () => { setNameDraft(s.name); setEditing(true); };
 
   return (
     <header className="flex flex-wrap items-center gap-2 border-b border-zinc-200 bg-white px-3 py-2 dark:border-zinc-800 dark:bg-zinc-950">
@@ -59,7 +59,7 @@ export function Toolbar() {
             <hr className="my-1 border-zinc-200 dark:border-zinc-800" />
             <Item onClick={() => { const n = prompt("Name for the new design?", "Untitled gym"); if (n) s.newDesign(n); close(); }}>New design…</Item>
             <Item onClick={() => { s.duplicateDesign(); close(); }}>Duplicate current</Item>
-            <Item onClick={() => { setEditing(true); close(); }}>Rename current</Item>
+            <Item onClick={() => { startRename(); close(); }}>Rename current</Item>
           </>
         )}
       </Menu>
@@ -68,7 +68,7 @@ export function Toolbar() {
         <input autoFocus className="rounded border border-blue-500 bg-transparent px-2 py-1 text-sm outline-none" value={nameDraft} onChange={(e) => setNameDraft(e.target.value)}
           onBlur={() => { setEditing(false); if (nameDraft.trim()) s.renameDesign(nameDraft.trim()); }} onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); if (e.key === "Escape") { setNameDraft(s.name); setEditing(false); } }} />
       ) : (
-        <button className="max-w-60 truncate rounded px-2 py-1 text-sm font-medium hover:bg-zinc-100 dark:hover:bg-zinc-800" title="Click to rename" onClick={() => setEditing(true)}>{s.name}</button>
+        <button className="max-w-60 truncate rounded px-2 py-1 text-sm font-medium hover:bg-zinc-100 dark:hover:bg-zinc-800" title="Click to rename" onClick={startRename}>{s.name}</button>
       )}
       <span className={`text-xs ${dirty ? "text-amber-600" : "text-emerald-600"}`}>{dirty ? "● Unsaved changes" : "✓ Saved"}</span>
       <button className={b} onClick={s.saveCurrent} disabled={!dirty}>Save</button>

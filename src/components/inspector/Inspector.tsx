@@ -6,7 +6,7 @@ import { ACCESSORY_DIMS, newAccessory, pegGrid, type AccessoryKind, type Pegboar
 import { PLATE_PRESETS, groupsWeight, kgToLbStr, plateLabel, type PlateGroup } from "@/lib/equipment/plates";
 import type { RackConfig } from "@/lib/equipment/rack";
 import { dimsOf, worldPlacement } from "@/lib/geometry/world";
-import { issuesFor, validateScene } from "@/lib/geometry/validation";
+import { issuesFor, validateSceneCached } from "@/lib/geometry/validation";
 import { newId } from "@/lib/scene/ids";
 import type { EquipmentInstance, WallId } from "@/lib/scene/types";
 import { alignToWall, centerInRoom, groupInstances, mountTo, ungroupInstances, updateConfig, updateInstance, updatePlacement, wallMount } from "@/lib/store/scene-ops";
@@ -29,7 +29,7 @@ export function Inspector({ inst }: { inst: EquipmentInstance }) {
   const def = getDef(inst.type);
   const dims = dimsOf(inst);
   const wp = worldPlacement(inst, scene);
-  const issues = useMemo(() => issuesFor(validateScene(scene), inst.id), [scene, inst.id]);
+  const issues = useMemo(() => issuesFor(validateSceneCached(scene), inst.id), [scene, inst.id]);
   const problems = def ? def.validate(inst.config) : [];
   const meta = def?.metadata?.(inst.config) ?? [];
   const patchConfig = (p: Record<string, unknown>) => commit((s) => updateConfig(s, inst.id, p));
