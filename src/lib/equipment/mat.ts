@@ -27,8 +27,8 @@ export const matDef: EquipmentDef<MatConfig> = {
     { key: "length", kind: "length", label: "Length", min: 100, max: 5000 },
     { key: "width", kind: "length", label: "Width", min: 100, max: 5000 },
     { key: "thickness", kind: "length", label: "Thickness", min: 3, max: 100 },
-    { key: "color", kind: "color", label: "Color" },
-    { key: "texture", kind: "select", label: "Texture", options: [{ value: "smooth", label: "Smooth" }, { value: "pebble", label: "Pebble" }, { value: "ribbed", label: "Ribbed" }] },
+    { key: "color", kind: "color", label: "Color", advanced: true },
+    { key: "texture", kind: "select", label: "Texture", advanced: true, options: [{ value: "smooth", label: "Smooth" }, { value: "pebble", label: "Pebble" }, { value: "ribbed", label: "Ribbed" }] },
   ],
   validate: (c) => (c.length <= 0 || c.width <= 0 || c.thickness <= 0 ? ["Mat dimensions must be positive."] : []),
   sanitize: (c) => {

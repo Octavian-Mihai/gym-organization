@@ -39,8 +39,10 @@ export function useShortcuts() {
       }
     };
     window.addEventListener("keydown", onKey);
-    const beforeUnload = (e: BeforeUnloadEvent) => { const s = useStore.getState(); if (s.scene !== s.savedScene) { e.preventDefault(); } };
-    window.addEventListener("beforeunload", beforeUnload);
-    return () => { window.removeEventListener("keydown", onKey); window.removeEventListener("beforeunload", beforeUnload); };
+    // flush any pending autosave when the tab is hidden or closed
+    const flush = () => { const s = useStore.getState(); if (s.scene !== s.savedScene) s.saveCurrent(); };
+    window.addEventListener("pagehide", flush);
+    document.addEventListener("visibilitychange", flush);
+    return () => { window.removeEventListener("keydown", onKey); window.removeEventListener("pagehide", flush); document.removeEventListener("visibilitychange", flush); };
   }, []);
 }

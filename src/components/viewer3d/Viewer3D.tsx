@@ -12,6 +12,7 @@ import { snapMove } from "@/lib/geometry/snap";
 import { validateSceneCached, type Issue } from "@/lib/geometry/validation";
 import type { EquipmentInstance, Opening, Room, Scene, WallId } from "@/lib/scene/types";
 import { useStore } from "@/lib/store/useStore";
+import { Popover } from "../ui/Popover";
 import { formatLength } from "@/lib/units";
 
 const MAT: Record<Material, { rough: number; metal: number }> = {
@@ -327,7 +328,7 @@ function LabelProjector({ labels, els }: { labels: React.MutableRefObject<Label[
   return null;
 }
 
-export function Viewer3D() {
+export function Viewer3D({ active = true }: { active?: boolean }) {
   const scene = useStore((s) => s.scene);
   const selection = useStore((s) => s.selection);
   const unit = useStore((s) => s.settings.displayUnit);
@@ -356,7 +357,7 @@ export function Viewer3D() {
 
   return (
     <div className="relative h-full w-full bg-gradient-to-b from-zinc-200 to-zinc-100 dark:from-zinc-900 dark:to-zinc-950">
-      <Canvas shadows dpr={[1, 2]} gl={{ preserveDrawingBuffer: true, antialias: true }}>
+      <Canvas shadows dpr={[1, 2]} frameloop={active ? "always" : "never"} gl={{ preserveDrawingBuffer: true, antialias: true }}>
         <Scene3D issues={issues} />
         <LabelProjector labels={labelsRef} els={els} />
       </Canvas>
@@ -372,36 +373,34 @@ export function Viewer3D() {
         ))}
       </div>
       <ViewControls3D />
-      <div className="pointer-events-none absolute bottom-3 left-3 rounded bg-white/80 px-2 py-1 text-xs text-zinc-600 dark:bg-zinc-900/80 dark:text-zinc-400">Drag objects to move · Left-drag background orbit · Right-drag pan · Wheel zoom · {scene.equipment.length} objects</div>
+      <div className="pointer-events-none absolute bottom-3 left-3 rounded bg-white/80 px-2 py-1 text-xs text-zinc-600 dark:bg-zinc-900/80 dark:text-zinc-400">Drag an object to move it · drag background to orbit · right-drag to pan</div>
     </div>
   );
 }
 
 function ViewControls3D() {
   const s = useStore();
-  const btn = "rounded px-2 py-1 text-xs hover:bg-zinc-100 dark:hover:bg-zinc-800";
+  const btn = "rounded-md px-2 py-1 text-xs hover:bg-zinc-100 dark:hover:bg-zinc-800";
   const walls: WallId[] = ["north", "east", "south", "west"];
   return (
-    <div className="absolute right-3 top-3 flex max-w-[260px] flex-col gap-2 rounded-md border border-zinc-300 bg-white/90 p-2 text-xs shadow-sm dark:border-zinc-700 dark:bg-zinc-900/90">
-      <div className="flex flex-wrap gap-1">
-        {(["iso", "top", "front", "side"] as const).map((p) => <button key={p} className={`${btn} border border-zinc-200 dark:border-zinc-700`} onClick={() => s.setCameraPreset(p)}>{p === "iso" ? "Isometric" : p[0].toUpperCase() + p.slice(1)}</button>)}
-      </div>
-      <div className="flex flex-wrap gap-3">
-        <label className="flex items-center gap-1"><input type="checkbox" checked={s.ortho} onChange={(e) => s.set3d({ ortho: e.target.checked })} />Orthographic</label>
-        <label className="flex items-center gap-1"><input type="checkbox" checked={s.showCeiling} onChange={(e) => s.set3d({ showCeiling: e.target.checked })} />Ceiling</label>
-        <label className="flex items-center gap-1"><input type="checkbox" checked={s.wireframe} onChange={(e) => s.set3d({ wireframe: e.target.checked })} />Wireframe</label>
-      </div>
-      <div className="space-y-1">
-        <div className="text-[10px] font-semibold uppercase tracking-wide text-zinc-500">Walls</div>
-        {walls.map((w) => (
-          <div key={w} className="flex items-center justify-between gap-2">
-            <span className="w-12 capitalize">{w}</span>
-            <select className="rounded border border-zinc-300 bg-transparent px-1 dark:border-zinc-700" value={s.wallVis[w]} onChange={(e) => s.setWallVis(w, e.target.value as "auto" | "visible" | "transparent" | "hidden")}>
-              <option value="auto">Auto (hide facing)</option><option value="visible">Visible</option><option value="transparent">Transparent</option><option value="hidden">Hidden</option>
-            </select>
-          </div>
-        ))}
-      </div>
+    <div className="absolute right-3 top-3 flex items-center gap-1 rounded-lg border border-zinc-300 bg-white/95 p-1 text-xs shadow-sm dark:border-zinc-700 dark:bg-zinc-900/95" data-ui>
+      {(["iso", "top", "front", "side"] as const).map((p) => <button key={p} className={btn} onClick={() => s.setCameraPreset(p)}>{p === "iso" ? "Iso" : p[0].toUpperCase() + p.slice(1)}</button>)}
+      <Popover label="View ▾" align="right" panelClassName="w-56 space-y-2 text-xs">
+        <label className="flex items-center gap-2"><input type="checkbox" checked={s.ortho} onChange={(e) => s.set3d({ ortho: e.target.checked })} />Orthographic camera</label>
+        <label className="flex items-center gap-2"><input type="checkbox" checked={s.showCeiling} onChange={(e) => s.set3d({ showCeiling: e.target.checked })} />Show ceiling</label>
+        <label className="flex items-center gap-2"><input type="checkbox" checked={s.wireframe} onChange={(e) => s.set3d({ wireframe: e.target.checked })} />Wireframe</label>
+        <div className="space-y-1 border-t border-zinc-200 pt-2 dark:border-zinc-700">
+          <div className="text-[10px] font-semibold uppercase tracking-wide text-zinc-500">Walls</div>
+          {walls.map((w) => (
+            <div key={w} className="flex items-center justify-between gap-2">
+              <span className="capitalize">{w}</span>
+              <select className="rounded border border-zinc-300 bg-transparent px-1 dark:border-zinc-700" value={s.wallVis[w]} onChange={(e) => s.setWallVis(w, e.target.value as "auto" | "visible" | "transparent" | "hidden")}>
+                <option value="auto">Auto</option><option value="visible">Visible</option><option value="transparent">Transparent</option><option value="hidden">Hidden</option>
+              </select>
+            </div>
+          ))}
+        </div>
+      </Popover>
     </div>
   );
 }

@@ -33,7 +33,7 @@ export interface PegboardConfig {
   accessories: PegAccessory[];
 }
 
-const MATERIAL_COLORS = { hardboard: "#a16207", steel: "#9ca3af", plywood: "#d6a96a", plastic: "#e5e7eb" } as const;
+export const MATERIAL_COLORS = { hardboard: "#a16207", steel: "#9ca3af", plywood: "#d6a96a", plastic: "#e5e7eb" } as const;
 
 export function pegGrid(c: PegboardConfig) {
   const cols = Math.max(1, Math.floor((c.width - c.holeSpacing) / c.holeSpacing) + 1);
@@ -82,11 +82,11 @@ export const pegboardDef: EquipmentDef<PegboardConfig> = {
   fields: [
     { key: "width", kind: "length", label: "Width", min: 100, max: 5000 },
     { key: "height", kind: "length", label: "Height", min: 100, max: 3000 },
-    { key: "thickness", kind: "length", label: "Thickness", min: 2, max: 60 },
-    { key: "holeDiameter", kind: "length", label: "Hole diameter", min: 2, max: 30 },
-    { key: "holeSpacing", kind: "length", label: "Hole spacing", min: 10, max: 100 },
     { key: "material", kind: "select", label: "Material", options: [{ value: "hardboard", label: "Hardboard" }, { value: "plywood", label: "Plywood" }, { value: "steel", label: "Steel" }, { value: "plastic", label: "Plastic" }] },
-    { key: "color", kind: "color", label: "Color" },
+    { key: "thickness", kind: "length", label: "Thickness", advanced: true, min: 2, max: 60 },
+    { key: "holeDiameter", kind: "length", label: "Hole diameter", advanced: true, min: 2, max: 30 },
+    { key: "holeSpacing", kind: "length", label: "Hole spacing", advanced: true, min: 10, max: 100 },
+    { key: "color", kind: "color", label: "Color", advanced: true },
   ],
   validate: (c) => (c.holeSpacing <= c.holeDiameter * 1.5 ? ["Hole spacing too tight for the hole diameter."] : []),
   sanitize: (c) => {

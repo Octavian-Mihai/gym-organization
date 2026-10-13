@@ -18,7 +18,8 @@ npm run build
 - **2D planner (SVG)**: pan/zoom, grid + snapping to grid / walls / object edges (hold Alt to bypass), drag, rotate handle, edge resize handles, marquee + shift multi-select, numeric X/Y/rotation, center-in-room, align-to-wall, dimension annotations and distances to walls, clearance overlays, issue markers.
 - **3D view (React Three Fiber)**: orbit/pan/zoom, perspective/orthographic, iso/top/front/side presets, per-wall auto/visible/transparent/hidden, optional ceiling, wireframe, shadows, instanced hole patterns, drag-to-move on the floor, labelled selection.
 - **Checks**: outside room, physical intersection (3D-aware per component), insufficient clearance, door/window blocking, wall obstacles, wall-mount bounds, ceiling height. Mounted/contained objects (e.g. a barbell in a rack) are exempt from collisions with their parent. Click any warning to select the objects involved.
-- **Designs**: multiple designs, save / revert / duplicate / rename / delete, autosaved draft, versioned JSON export/import with validation, floor plan export to PNG / SVG / print-to-PDF.
+- **Designs**: multiple designs (new / duplicate / rename / delete), continuous autosave to the browser (undo/redo is the way back), versioned JSON export/import with validation, floor plan export to PNG / SVG / print-to-PDF.
+- **Interface**: the right-hand inspector only appears when something is selected and shows the essentials first (position, main size options); everything else is under *Advanced*. Layout checks live in a toolbar badge, and view options are tucked into small popovers.
 - **Shortcuts**: Del, ⌘/Ctrl+D, ⌘/Ctrl+Z, ⇧⌘/Ctrl+Z, ⌘/Ctrl+C/V/A/S, R rotate, H hide, L lock, arrows nudge, 1/2/3 switch 2D/3D/Split.
 
 ## Architecture

@@ -24,7 +24,7 @@ export function LengthField({ label, value, onChange, min, max, disabled, hint }
   };
   return (
     <label className="flex items-center gap-2 text-xs" title={hint}>
-      <span className="w-28 shrink-0 truncate text-zinc-600 dark:text-zinc-400">{label}</span>
+      {label && <span className="w-28 shrink-0 truncate text-zinc-600 dark:text-zinc-400">{label}</span>}
       <input
         className={`${inputCls} ${bad ? "border-red-500" : ""}`}
         value={shown}
@@ -52,7 +52,7 @@ export function NumberField({ label, value, onChange, min, max, step = 1, suffix
   };
   return (
     <label className="flex items-center gap-2 text-xs">
-      <span className="w-28 shrink-0 truncate text-zinc-600 dark:text-zinc-400">{label}</span>
+      {label && <span className="w-28 shrink-0 truncate text-zinc-600 dark:text-zinc-400">{label}</span>}
       <input className={inputCls} type="text" inputMode="decimal" value={shown} disabled={disabled}
         onFocus={(e) => { setDraft(String(round(value))); e.target.select(); }} onChange={(e) => setDraft(e.target.value)} onBlur={commit}
         onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); if (e.key === "ArrowUp") { e.preventDefault(); onChange(Math.min(max ?? Infinity, value + step)); } if (e.key === "ArrowDown") { e.preventDefault(); onChange(Math.max(min ?? -Infinity, value - step)); } e.stopPropagation(); }} />
@@ -66,7 +66,7 @@ export function TextField({ label, value, onChange, disabled }: { label: string;
   const [draft, setDraft] = useState<string | null>(null);
   return (
     <label className="flex items-center gap-2 text-xs">
-      <span className="w-28 shrink-0 truncate text-zinc-600 dark:text-zinc-400">{label}</span>
+      {label && <span className="w-28 shrink-0 truncate text-zinc-600 dark:text-zinc-400">{label}</span>}
       <input className={inputCls} value={draft ?? value} disabled={disabled} onFocus={() => setDraft(value)} onChange={(e) => setDraft(e.target.value)}
         onBlur={() => { if (draft !== null && draft !== value) onChange(draft); setDraft(null); }} onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); e.stopPropagation(); }} />
     </label>
@@ -76,7 +76,7 @@ export function TextField({ label, value, onChange, disabled }: { label: string;
 export function ColorField({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
   return (
     <label className="flex items-center gap-2 text-xs">
-      <span className="w-28 shrink-0 truncate text-zinc-600 dark:text-zinc-400">{label}</span>
+      {label && <span className="w-28 shrink-0 truncate text-zinc-600 dark:text-zinc-400">{label}</span>}
       <input type="color" value={/^#[0-9a-f]{6}$/i.test(value) ? value : "#888888"} onChange={(e) => onChange(e.target.value)} className="h-6 w-10 cursor-pointer rounded border border-zinc-300 bg-transparent p-0 dark:border-zinc-700" />
       <span className="font-mono text-zinc-500">{value}</span>
     </label>
@@ -86,7 +86,7 @@ export function ColorField({ label, value, onChange }: { label: string; value: s
 export function BoolField({ label, value, onChange }: { label: string; value: boolean; onChange: (v: boolean) => void }) {
   return (
     <label className="flex items-center gap-2 text-xs">
-      <span className="w-28 shrink-0 truncate text-zinc-600 dark:text-zinc-400">{label}</span>
+      {label && <span className="w-28 shrink-0 truncate text-zinc-600 dark:text-zinc-400">{label}</span>}
       <input type="checkbox" checked={value} onChange={(e) => onChange(e.target.checked)} />
     </label>
   );
@@ -95,7 +95,7 @@ export function BoolField({ label, value, onChange }: { label: string; value: bo
 export function SelectField({ label, value, options, onChange }: { label: string; value: string; options: { value: string; label: string }[]; onChange: (v: string) => void }) {
   return (
     <label className="flex items-center gap-2 text-xs">
-      <span className="w-28 shrink-0 truncate text-zinc-600 dark:text-zinc-400">{label}</span>
+      {label && <span className="w-28 shrink-0 truncate text-zinc-600 dark:text-zinc-400">{label}</span>}
       <select className={inputCls} value={value} onChange={(e) => onChange(e.target.value)}>
         {options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
       </select>
@@ -103,15 +103,17 @@ export function SelectField({ label, value, options, onChange }: { label: string
   );
 }
 
-/** Renders a def's declared fields, grouped, for any config object. */
-export function ConfigFields({ fields, config, onChange, disabled }: { fields: FieldDef[]; config: Record<string, unknown>; onChange: (patch: Record<string, unknown>) => void; disabled?: boolean }) {
+/** Renders a def's declared fields (basic or advanced tier), grouped, honoring `showIf`. */
+export function ConfigFields({ fields, config, onChange, disabled, tier = "basic" }: { fields: FieldDef[]; config: Record<string, unknown>; onChange: (patch: Record<string, unknown>) => void; disabled?: boolean; tier?: "basic" | "advanced" }) {
+  const visible = fields.filter((f) => !!f.advanced === (tier === "advanced") && (!f.showIf || f.showIf(config)));
   const groups: Record<string, FieldDef[]> = {};
-  for (const f of fields) (groups[f.group ?? ""] ||= []).push(f);
+  for (const f of visible) (groups[f.group ?? ""] ||= []).push(f);
+  if (visible.length === 0) return null;
   return (
     <div className="space-y-3">
       {Object.entries(groups).map(([g, fs]) => (
         <div key={g} className="space-y-1.5">
-          {g && <div className="text-[10px] font-semibold uppercase tracking-wide text-zinc-500">{g}</div>}
+          {g && <div className="pt-1 text-[10px] font-semibold uppercase tracking-wide text-zinc-500">{g}</div>}
           {fs.map((f) => {
             const v = config[f.key];
             switch (f.kind) {

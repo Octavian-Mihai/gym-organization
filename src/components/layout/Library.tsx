@@ -62,9 +62,9 @@ function MatLayoutTool() {
   const [rot, setRot] = useState("0");
   const commit = useStore((s) => s.commit);
   return (
-    <div className="mt-3 rounded border border-zinc-200 p-2 dark:border-zinc-800">
-      <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-500">Mat layout tool</div>
-      <div className="space-y-1.5">
+    <details className="mt-3 rounded border border-zinc-200 p-2 dark:border-zinc-800">
+      <summary className="cursor-pointer select-none text-xs font-semibold uppercase tracking-wide text-zinc-500">Lay out a grid of mats</summary>
+      <div className="mt-2 space-y-1.5">
         <SelectField label="Mat size" value={preset} options={matDef.presets!.map((p) => ({ value: p.id, label: p.label }))} onChange={setPreset} />
         <NumberField label="Rows" value={rows} min={1} max={20} integer onChange={setRows} />
         <NumberField label="Columns" value={cols} min={1} max={20} integer onChange={setCols} />
@@ -75,8 +75,8 @@ function MatLayoutTool() {
           commit((s) => { const r = addMatGrid(s, { rows, cols, preset: p.config, originX: 0, originY: 0, rotation: Number(rot) }); ids = r.newIds; return r.scene; });
           useStore.getState().select(ids);
         }}>Create {rows * cols} mats from the top-left corner</button>
-        <p className="text-[11px] text-zinc-500">Each mat is an independent object you can move, rotate, resize or delete afterwards.</p>
+        <p className="text-[11px] text-zinc-500">Each mat stays an independent object you can move, rotate or delete afterwards.</p>
       </div>
-    </div>
+    </details>
   );
 }

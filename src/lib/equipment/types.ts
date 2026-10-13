@@ -54,6 +54,10 @@ export interface FieldBase {
   /** optional group heading in the inspector */
   group?: string;
   help?: string;
+  /** hidden under the inspector's "Advanced" section */
+  advanced?: boolean;
+  /** only show when this returns true for the current config */
+  showIf?: (config: any) => boolean; // eslint-disable-line @typescript-eslint/no-explicit-any
 }
 export type FieldDef =
   | (FieldBase & { kind: "length"; min?: number; max?: number })

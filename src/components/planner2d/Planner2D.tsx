@@ -9,6 +9,7 @@ import { validateSceneCached, type Issue } from "@/lib/geometry/validation";
 import type { EquipmentInstance, Opening, Scene, WallId } from "@/lib/scene/types";
 import { resizePatch, updateConfig, updatePlacement, wallMount } from "@/lib/store/scene-ops";
 import { useStore } from "@/lib/store/useStore";
+import { Popover } from "../ui/Popover";
 import { formatLength } from "@/lib/units";
 
 interface View { ox: number; oy: number; k: number }
@@ -113,6 +114,7 @@ export function Planner2D() {
   const [spaceDown, setSpaceDown] = useState(false);
   const [hover, setHover] = useState<string | null>(null);
   const fitted = useRef(false);
+  const sizeRef = useRef({ w: 0, h: 0 });
 
   const issues = useMemo(() => validateSceneCached(scene), [scene]);
   const issueIds = useMemo(() => new Set(issues.filter((i) => i.kind !== "clearance").flatMap((i) => i.objectIds)), [issues]);
@@ -128,9 +130,17 @@ export function Planner2D() {
   useEffect(() => {
     const el = ref.current?.parentElement;
     if (!el) return;
-    const ro = new ResizeObserver(() => setSize({ w: el.clientWidth, h: el.clientHeight }));
+    const apply = () => {
+      const w = el.clientWidth, h = el.clientHeight;
+      const prev = sizeRef.current;
+      // keep the same point at the center of the canvas when panels open/close
+      if (prev.w > 100 && w > 100) setView((v) => ({ ...v, ox: v.ox + (w - prev.w) / 2, oy: v.oy + (h - prev.h) / 2 }));
+      sizeRef.current = { w, h };
+      setSize({ w, h });
+    };
+    const ro = new ResizeObserver(apply);
     ro.observe(el);
-    setSize({ w: el.clientWidth, h: el.clientHeight });
+    apply();
     return () => ro.disconnect();
   }, []);
   useEffect(() => { if (!fitted.current && size.w > 100) { fit(); fitted.current = true; } }, [size, fit]);
@@ -435,18 +445,17 @@ export function Planner2D() {
         <button className="rounded px-2 py-1 hover:bg-zinc-100 dark:hover:bg-zinc-800" onClick={() => setView((v) => ({ ...v, k: Math.min(2, v.k * 1.25), ox: size.w / 2 - (size.w / 2 - v.ox) * 1.25, oy: size.h / 2 - (size.h / 2 - v.oy) * 1.25 }))}>＋</button>
         <button className="rounded px-2 py-1 hover:bg-zinc-100 dark:hover:bg-zinc-800" onClick={() => setView((v) => ({ ...v, k: Math.max(0.01, v.k / 1.25), ox: size.w / 2 - (size.w / 2 - v.ox) / 1.25, oy: size.h / 2 - (size.h / 2 - v.oy) / 1.25 }))}>－</button>
       </div>
-      <div className="absolute bottom-3 left-3 flex flex-wrap items-center gap-3 rounded-md border border-zinc-300 bg-white/90 px-2 py-1 text-xs shadow-sm dark:border-zinc-700 dark:bg-zinc-900/90" data-ui>
-        <label className="flex items-center gap-1"><input type="checkbox" checked={settings.snapToGrid} onChange={(e) => st().setSettings({ snapToGrid: e.target.checked })} />Grid snap</label>
-        <label className="flex items-center gap-1"><input type="checkbox" checked={settings.snapToWalls} onChange={(e) => st().setSettings({ snapToWalls: e.target.checked })} />Walls</label>
-        <label className="flex items-center gap-1"><input type="checkbox" checked={settings.snapToObjects} onChange={(e) => st().setSettings({ snapToObjects: e.target.checked })} />Objects</label>
-        <label className="flex items-center gap-1"><input type="checkbox" checked={settings.showClearances} onChange={(e) => st().setSettings({ showClearances: e.target.checked })} />Clearances</label>
-        <label className="flex items-center gap-1"><input type="checkbox" checked={settings.showDimensions} onChange={(e) => st().setSettings({ showDimensions: e.target.checked })} />Dimensions</label>
-        <label className="flex items-center gap-1">Grid
-          <select className="rounded border border-zinc-300 bg-transparent px-1 dark:border-zinc-700" value={settings.gridSize} onChange={(e) => st().setSettings({ gridSize: Number(e.target.value) })}>
-            <option value={25.4}>1 in</option><option value={50.8}>2 in</option><option value={152.4}>6 in</option><option value={304.8}>1 ft</option><option value={50}>5 cm</option><option value={100}>10 cm</option><option value={500}>50 cm</option>
-          </select>
-        </label>
-        <span className="text-zinc-500">Alt = no snap · Space/right-drag = pan · Wheel = zoom</span>
+      <div className="absolute bottom-3 left-3 flex items-center gap-2 rounded-lg border border-zinc-300 bg-white/95 px-2 py-1.5 text-xs shadow-sm dark:border-zinc-700 dark:bg-zinc-900/95" data-ui>
+        <button className={`rounded px-2 py-1 ${settings.snapToGrid ? "bg-blue-600 text-white" : "border border-zinc-300 dark:border-zinc-700"}`} title="Snap to grid (hold Alt while dragging to bypass)" onClick={() => st().setSettings({ snapToGrid: !settings.snapToGrid })}>Snap {settings.snapToGrid ? "on" : "off"}</button>
+        <select className="rounded border border-zinc-300 bg-transparent px-1 py-1 dark:border-zinc-700" title="Grid size" value={settings.gridSize} onChange={(e) => st().setSettings({ gridSize: Number(e.target.value) })}>
+          <option value={25.4}>1 in</option><option value={50.8}>2 in</option><option value={152.4}>6 in</option><option value={304.8}>1 ft</option><option value={50}>5 cm</option><option value={100}>10 cm</option><option value={500}>50 cm</option>
+        </select>
+        <Popover label="Show ▾" up panelClassName="w-44 space-y-1">
+          <label className="flex items-center gap-2"><input type="checkbox" checked={settings.showDimensions} onChange={(e) => st().setSettings({ showDimensions: e.target.checked })} />Dimensions</label>
+          <label className="flex items-center gap-2"><input type="checkbox" checked={settings.showClearances} onChange={(e) => st().setSettings({ showClearances: e.target.checked })} />Clearance zones</label>
+          <label className="flex items-center gap-2"><input type="checkbox" checked={settings.snapToWalls} onChange={(e) => st().setSettings({ snapToWalls: e.target.checked })} />Snap to walls</label>
+          <label className="flex items-center gap-2"><input type="checkbox" checked={settings.snapToObjects} onChange={(e) => st().setSettings({ snapToObjects: e.target.checked })} />Snap to objects</label>
+        </Popover>
       </div>
     </div>
   );

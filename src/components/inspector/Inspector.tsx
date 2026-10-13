@@ -7,6 +7,7 @@ import { PLATE_PRESETS, groupsWeight, kgToLbStr, plateLabel, type PlateGroup } f
 import type { RackConfig } from "@/lib/equipment/rack";
 import { dimsOf, worldPlacement } from "@/lib/geometry/world";
 import { issuesFor, validateSceneCached } from "@/lib/geometry/validation";
+import { normalizeConfigPatch } from "@/lib/equipment/config-rules";
 import { newId } from "@/lib/scene/ids";
 import type { EquipmentInstance, WallId } from "@/lib/scene/types";
 import { alignToWall, centerInRoom, groupInstances, mountTo, ungroupInstances, updateConfig, updateInstance, updatePlacement, wallMount } from "@/lib/store/scene-ops";
@@ -20,7 +21,7 @@ const Section = ({ title, children, defaultOpen = true }: { title: string; child
     <div className="mt-2 space-y-1.5">{children}</div>
   </details>
 );
-const smallBtn = "rounded border border-zinc-300 px-2 py-0.5 text-xs hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-800";
+const smallBtn = "rounded border border-zinc-300 px-2 py-0.5 text-xs hover:bg-zinc-100 disabled:opacity-40 dark:border-zinc-700 dark:hover:bg-zinc-800";
 
 export function Inspector({ inst }: { inst: EquipmentInstance }) {
   const scene = useStore((s) => s.scene);
@@ -32,28 +33,31 @@ export function Inspector({ inst }: { inst: EquipmentInstance }) {
   const issues = useMemo(() => issuesFor(validateSceneCached(scene), inst.id), [scene, inst.id]);
   const problems = def ? def.validate(inst.config) : [];
   const meta = def?.metadata?.(inst.config) ?? [];
-  const patchConfig = (p: Record<string, unknown>) => commit((s) => updateConfig(s, inst.id, p));
+  const patchConfig = (p: Record<string, unknown>) => commit((s) => updateConfig(s, inst.id, normalizeConfigPatch(inst.type, inst.config as Record<string, unknown>, p)));
   const patchPlace = (p: Partial<EquipmentInstance["placement"]>) => commit((s) => updatePlacement(s, inst.id, p));
   const patchInst = (p: Partial<EquipmentInstance>) => commit((s) => updateInstance(s, inst.id, p));
-  const mountTargets = scene.equipment.filter((e) => e.id !== inst.id && !e.parentId);
+  const mountTargets = scene.equipment.filter((e) => e.id !== inst.id && !e.parentId && e.type !== "stall-mat");
   const isWall = !!def?.wallMounted;
   const dis = inst.locked;
+  const cfg = inst.config as Record<string, unknown>;
 
   return (
     <div className="p-3 text-sm">
-      <div className="mb-2 flex items-center justify-between">
-        <div>
+      <div className="mb-1 flex items-start justify-between gap-2">
+        <div className="min-w-0 flex-1">
           <div className="text-xs text-zinc-500">{def?.label ?? inst.type}</div>
-          <div className="font-semibold">{inst.name}</div>
+          <TextField label="" value={inst.name} onChange={(name) => patchInst({ name })} />
         </div>
-        <div className="flex gap-1">
-          <button className={smallBtn} title={inst.locked ? "Unlock position" : "Lock position"} onClick={() => patchInst({ locked: !inst.locked })}>{inst.locked ? "🔒" : "🔓"}</button>
-          <button className={smallBtn} title="Hide in both views" onClick={() => { patchInst({ hidden: true }); useStore.getState().select([]); }}>Hide</button>
-        </div>
+        <button className="text-zinc-400 hover:text-zinc-700" title="Deselect (Esc)" onClick={() => useStore.getState().select([])}>✕</button>
       </div>
-
       <div className="mb-2 rounded bg-zinc-100 px-2 py-1.5 font-mono text-xs dark:bg-zinc-800">
         {formatLength(dims.width, unit)} W × {formatLength(dims.depth, unit)} D × {formatLength(dims.height, unit)} H
+      </div>
+      <div className="mb-2 flex flex-wrap gap-1">
+        <button className={smallBtn} onClick={() => useStore.getState().duplicateSelected()}>Duplicate</button>
+        <button className={smallBtn} onClick={() => patchInst({ locked: !inst.locked })}>{inst.locked ? "🔒 Locked" : "Lock"}</button>
+        <button className={smallBtn} onClick={() => { patchInst({ hidden: true }); useStore.getState().select([]); }}>Hide</button>
+        <button className="rounded border border-red-300 px-2 py-0.5 text-xs text-red-700 hover:bg-red-50 disabled:opacity-40 dark:border-red-800 dark:text-red-300 dark:hover:bg-red-950" onClick={() => useStore.getState().deleteSelected()} disabled={dis}>Delete</button>
       </div>
 
       {(issues.length > 0 || problems.length > 0) && (
@@ -63,68 +67,62 @@ export function Inspector({ inst }: { inst: EquipmentInstance }) {
         </div>
       )}
 
-      <Section title="Identity">
-        <TextField label="Name" value={inst.name} onChange={(name) => patchInst({ name })} />
-        <ColorField label="Tint override" value={inst.color ?? "#888888"} onChange={(color) => patchInst({ color })} />
-      </Section>
-
-      <Section title="Position & rotation">
-        {inst.parentId && <div className="text-xs text-zinc-500">Offsets are relative to the parent. World: {formatLength(wp.x, unit)}, {formatLength(wp.y, unit)}</div>}
-        <LengthField label={inst.parentId ? "Offset X" : "X (center)"} value={inst.placement.x} disabled={dis} onChange={(x) => patchPlace({ x })} />
-        <LengthField label={inst.parentId ? "Offset Y" : "Y (center)"} value={inst.placement.y} disabled={dis} onChange={(y) => patchPlace({ y })} />
-        <LengthField label={isWall || inst.parentId ? "Height above floor" : "Elevation"} value={inst.placement.z} disabled={dis} onChange={(z) => patchPlace({ z })} />
+      <Section title="Position">
+        {inst.parentId && <div className="text-xs text-zinc-500">Relative to {scene.equipment.find((e) => e.id === inst.parentId)?.name}. In the room: {formatLength(wp.x, unit)}, {formatLength(wp.y, unit)}</div>}
+        <LengthField label={inst.parentId ? "Offset X" : "X"} value={inst.placement.x} disabled={dis} onChange={(x) => patchPlace({ x })} />
+        <LengthField label={inst.parentId ? "Offset Y" : "Y"} value={inst.placement.y} disabled={dis} onChange={(y) => patchPlace({ y })} />
+        {(isWall || inst.parentId) && <LengthField label="Height off floor" value={inst.placement.z} disabled={dis} onChange={(z) => patchPlace({ z })} />}
         <NumberField label="Rotation" suffix="°" value={inst.placement.rotation} step={15} disabled={dis} onChange={(r) => patchPlace({ rotation: ((r % 360) + 360) % 360 })} />
-        <div className="flex flex-wrap gap-1 pt-1">
+        <div className="flex flex-wrap items-center gap-1 pt-1">
           <button className={smallBtn} disabled={dis} onClick={() => patchPlace({ rotation: (inst.placement.rotation + 90) % 360 })}>Rotate 90°</button>
-          {!isWall && !inst.parentId && <>
-            <button className={smallBtn} disabled={dis} onClick={() => commit((s) => centerInRoom(s, inst.id, "both"))}>Center in room</button>
-            <button className={smallBtn} disabled={dis} onClick={() => commit((s) => centerInRoom(s, inst.id, "x"))}>Center X</button>
-            <button className={smallBtn} disabled={dis} onClick={() => commit((s) => centerInRoom(s, inst.id, "y"))}>Center Y</button>
-            {(["north", "east", "south", "west"] as WallId[]).map((w) => <button key={w} className={smallBtn} disabled={dis} onClick={() => commit((s) => alignToWall(s, inst.id, w))}>→ {w}</button>)}
-          </>}
+          {!isWall && !inst.parentId && <button className={smallBtn} disabled={dis} onClick={() => commit((s) => centerInRoom(s, inst.id, "both"))}>Center</button>}
+          {!isWall && !inst.parentId && (
+            <select className="rounded border border-zinc-300 bg-transparent px-1 py-0.5 text-xs dark:border-zinc-700" disabled={dis} value="" onChange={(e) => e.target.value && commit((s) => alignToWall(s, inst.id, e.target.value as WallId))}>
+              <option value="">Push to wall…</option>
+              {(["north", "east", "south", "west"] as WallId[]).map((w) => <option key={w} value={w}>{w} wall</option>)}
+            </select>
+          )}
         </div>
-        {isWall && (
-          <SelectField label="Mounted on wall" value={inst.placement.wall ?? "north"} options={["north", "east", "south", "west"].map((w) => ({ value: w, label: w }))} onChange={(w) => commit((s) => updatePlacement(s, inst.id, wallMount(s, inst, w as WallId)))} />
-        )}
+        {isWall && <SelectField label="On wall" value={inst.placement.wall ?? "north"} options={["north", "east", "south", "west"].map((w) => ({ value: w, label: w }))} onChange={(w) => commit((s) => updatePlacement(s, inst.id, wallMount(s, inst, w as WallId)))} />}
       </Section>
 
-      {!isWall && (inst.type === "barbell" || mountTargets.length > 0) && (
-        <Section title="Mounting" defaultOpen={inst.type === "barbell"}>
-          <SelectField label="Placed on" value={inst.parentId ?? ""} options={[{ value: "", label: "Floor" }, ...mountTargets.filter((t) => t.type !== "stall-mat").map((t) => ({ value: t.id, label: `${t.name} (${getDef(t.type)?.label ?? t.type})` }))]} onChange={(v) => commit((s) => mountTo(s, inst.id, v || null))} />
-          {inst.parentId && <div className="text-[11px] text-zinc-500">Mounted objects move with their parent and are exempt from overlap warnings against it.</div>}
+      {inst.type === "barbell" && (
+        <Section title="Placed on">
+          <SelectField label="" value={inst.parentId ?? ""} options={[{ value: "", label: "Floor" }, ...mountTargets.map((t) => ({ value: t.id, label: t.name }))]} onChange={(v) => commit((s) => mountTo(s, inst.id, v || null))} />
+          {inst.parentId && <div className="text-[11px] text-zinc-500">Moves with its parent and is ignored in overlap checks against it.</div>}
         </Section>
       )}
 
       {def && (
-        <Section title="Configuration">
-          {def.presets && def.presets.length > 0 && (
-            <SelectField label="Preset" value="" options={[{ value: "", label: "Apply preset…" }, ...def.presets.map((p) => ({ value: p.id, label: p.label }))]} onChange={(id) => { const p = def.presets!.find((x) => x.id === id); if (p) patchConfig(p.config as Record<string, unknown>); }} />
+        <Section title="Size & options">
+          {def.presets && def.presets.length > 0 && inst.type !== "barbell" && (
+            <SelectField label="Preset" value="" options={[{ value: "", label: "Choose…" }, ...def.presets.map((p) => ({ value: p.id, label: p.label }))]} onChange={(id) => { const p = def.presets!.find((x) => x.id === id); if (p) patchConfig(p.config as Record<string, unknown>); }} />
           )}
-          <ConfigFields fields={def.fields} config={inst.config as Record<string, unknown>} onChange={patchConfig} disabled={dis} />
+          <ConfigFields fields={def.fields} config={cfg} onChange={patchConfig} disabled={dis} tier="basic" />
         </Section>
       )}
 
-      {inst.type === "power-rack" && <RackExtras inst={inst} patch={patchConfig} />}
       {inst.type === "barbell" && <PlatesEditor inst={inst} patch={patchConfig} />}
       {inst.type === "pegboard" && <PegAccessories inst={inst} patch={patchConfig} />}
 
-      <Section title="Clearance zone" defaultOpen={inst.clearance.enabled}>
-        <BoolField label="Show clearance" value={inst.clearance.enabled} onChange={(enabled) => patchInst({ clearance: { ...inst.clearance, enabled } })} />
-        <TextField label="Label" value={inst.clearance.label ?? ""} onChange={(label) => patchInst({ clearance: { ...inst.clearance, label } })} />
-        {(["front", "back", "left", "right"] as const).map((k) => <LengthField key={k} label={k[0].toUpperCase() + k.slice(1)} value={inst.clearance[k]} min={0} onChange={(v) => patchInst({ clearance: { ...inst.clearance, [k]: v } })} />)}
-        <p className="text-[11px] text-zinc-500">Front is the +Y side of the object (the tick on its selection box); for barbells, left/right are the sleeve ends. These are your own planning margins, not safety standards.</p>
-      </Section>
-
-      {meta.length > 0 && (
-        <Section title="Info">{meta.map((m) => <div key={m.label} className="flex justify-between text-xs"><span className="text-zinc-500">{m.label}</span><span>{m.value}</span></div>)}</Section>
-      )}
-
-      <div className="flex flex-wrap gap-1 pt-3">
-        <button className={smallBtn} onClick={() => useStore.getState().duplicateSelected()}>Duplicate</button>
-        <button className={smallBtn} onClick={() => commit((s) => groupInstances(s, useStore.getState().selection))}>Group</button>
-        <button className={smallBtn} onClick={() => commit((s) => ungroupInstances(s, useStore.getState().selection))}>Ungroup</button>
-        <button className="rounded border border-red-300 px-2 py-0.5 text-xs text-red-700 hover:bg-red-50 dark:border-red-800 dark:text-red-300 dark:hover:bg-red-950" onClick={() => useStore.getState().deleteSelected()} disabled={dis}>Delete</button>
-      </div>
+      <details className="py-2">
+        <summary className="cursor-pointer select-none text-xs font-semibold uppercase tracking-wide text-zinc-500">Advanced</summary>
+        <div className="mt-2 space-y-3">
+          {def && <ConfigFields fields={def.fields} config={cfg} onChange={patchConfig} disabled={dis} tier="advanced" />}
+          {inst.type === "power-rack" && <RackExtras inst={inst} patch={patchConfig} />}
+          <div className="space-y-1.5">
+            <div className="text-[10px] font-semibold uppercase tracking-wide text-zinc-500">Clearance zone</div>
+            <BoolField label="Show zone" value={inst.clearance.enabled} onChange={(enabled) => patchInst({ clearance: { ...inst.clearance, enabled } })} />
+            {inst.clearance.enabled && (["front", "back", "left", "right"] as const).map((k) => <LengthField key={k} label={k[0].toUpperCase() + k.slice(1)} value={inst.clearance[k]} min={0} onChange={(v) => patchInst({ clearance: { ...inst.clearance, [k]: v } })} />)}
+            {inst.clearance.enabled && <p className="text-[11px] text-zinc-500">Your own planning margins (not safety standards). Front is the side with the tick mark on the plan; for barbells left/right are the sleeve ends.</p>}
+          </div>
+          <div className="flex gap-1">
+            <button className={smallBtn} onClick={() => commit((s) => groupInstances(s, useStore.getState().selection))}>Group</button>
+            <button className={smallBtn} onClick={() => commit((s) => ungroupInstances(s, useStore.getState().selection))}>Ungroup</button>
+          </div>
+          {meta.map((m) => <div key={m.label} className="flex justify-between text-xs"><span className="text-zinc-500">{m.label}</span><span>{m.value}</span></div>)}
+        </div>
+      </details>
     </div>
   );
 }
@@ -139,7 +137,9 @@ function RackExtras({ inst, patch }: { inst: EquipmentInstance; patch: (p: Recor
   const upd = <K extends "crossmembers" | "pullupBars" | "safeties" | "jcups">(k: K, i: number, p: Partial<RackConfig[K][number]>) => patch({ [k]: c[k].map((x, j) => (j === i ? { ...x, ...p } : x)) });
   const del = (k: "crossmembers" | "pullupBars" | "safeties" | "jcups", i: number) => patch({ [k]: c[k].filter((_, j) => j !== i) });
   return (
-    <Section title="Components">
+    <details className="rounded border border-zinc-200 p-2 dark:border-zinc-800">
+      <summary className="cursor-pointer select-none text-[10px] font-semibold uppercase tracking-wide text-zinc-500">Crossmembers, pull-up bars, safeties, J-cups</summary>
+      <div className="mt-2 space-y-1.5">
       <ListHeader title={`Crossmembers (${c.crossmembers.length})`} onAdd={() => patch({ crossmembers: [...c.crossmembers, { id: newId("cm"), axis: "x", z: c.uprightHeight / 2, at: 0 }] })} />
       {c.crossmembers.map((m, i) => (
         <div key={m.id} className="space-y-1 rounded border border-zinc-200 p-1.5 dark:border-zinc-800">
@@ -174,7 +174,8 @@ function RackExtras({ inst, patch }: { inst: EquipmentInstance; patch: (p: Recor
       {c.jcups.map((j, i) => (
         <div key={j.id} className="flex items-center gap-2"><LengthField label="Height (z)" value={j.z} onChange={(z) => upd("jcups", i, { z })} /><button className={rm} onClick={() => del("jcups", i)}>✕</button></div>
       ))}
-    </Section>
+      </div>
+    </details>
   );
 }
 

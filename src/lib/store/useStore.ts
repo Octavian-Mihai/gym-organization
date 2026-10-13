@@ -9,7 +9,6 @@ import { DEFAULT_SETTINGS, loadCurrentId, loadDesigns, loadSettings, saveCurrent
 import * as ops from "./scene-ops";
 
 const HISTORY_LIMIT = 100;
-const DRAFT_KEY = "homegym:v1:draft";
 
 export type ViewMode = "2d" | "3d" | "split";
 export type WallVis = "auto" | "visible" | "transparent" | "hidden";
@@ -60,7 +59,6 @@ interface Actions {
   setCameraPreset(p: CameraPreset): void;
   // designs
   saveCurrent(): void;
-  revert(): void;
   newDesign(name?: string): void;
   duplicateDesign(): void;
   renameDesign(name: string): void;
@@ -80,12 +78,11 @@ export const useStore = create<State & Actions>()((set, get) => {
   const pushHistory = (prev: Scene) =>
     set((st) => ({ past: [...st.past, prev].slice(-HISTORY_LIMIT), future: [] }));
 
+  // Autosave: edits are written to the current design shortly after they stop. Undo/redo is the way back.
+  let autosaveTimer: ReturnType<typeof setTimeout> | null = null;
   const persistDraft = () => {
-    try {
-      const st = get();
-      if (st.scene === st.savedScene) localStorage.removeItem(DRAFT_KEY);
-      else localStorage.setItem(DRAFT_KEY, JSON.stringify({ id: st.currentId, scene: st.scene }));
-    } catch { /* storage unavailable */ }
+    if (autosaveTimer) clearTimeout(autosaveTimer);
+    autosaveTimer = setTimeout(() => { autosaveTimer = null; get().saveCurrent(); }, 500);
   };
 
   const loadInto = (d: Design) =>
@@ -122,17 +119,6 @@ export const useStore = create<State & Actions>()((set, get) => {
       const cur = list.find((d) => d.id === loadCurrentId()) ?? list[0];
       set({ hydrated: true, designs: list, settings, notices: warnings });
       loadInto(cur);
-      try {
-        const raw = localStorage.getItem(DRAFT_KEY);
-        if (raw) {
-          const dr = JSON.parse(raw);
-          if (dr.id === cur.id) {
-            const parsed = importJson(JSON.stringify({ design: { ...cur, scene: dr.scene } })).designs[0];
-            set({ scene: parsed.scene });
-            get().addNotice("Restored unsaved changes from your last session.");
-          }
-        }
-      } catch { /* ignore bad draft */ }
     },
 
     commit(fn) {
@@ -231,16 +217,9 @@ export const useStore = create<State & Actions>()((set, get) => {
       if (!saveDesigns(designs)) { get().addNotice("Could not save: browser storage is unavailable or full. Use Export to back up."); return; }
       saveCurrentId(st.currentId);
       set({ designs, savedScene: st.scene });
-      persistDraft();
-    },
-    revert() {
-      const st = get();
-      const d = st.designs.find((x) => x.id === st.currentId);
-      if (!d) return;
-      loadInto(d);
-      persistDraft();
     },
     newDesign(name = "Untitled gym") {
+      get().saveCurrent();
       const d = newDesign(name);
       const designs = [...get().designs, d];
       saveDesigns(designs);
@@ -249,6 +228,7 @@ export const useStore = create<State & Actions>()((set, get) => {
       loadInto(d);
     },
     duplicateDesign() {
+      get().saveCurrent();
       const st = get();
       const now = new Date().toISOString();
       const d: Design = { ...JSON.parse(JSON.stringify({ ...st.designs.find((x) => x.id === st.currentId)!, scene: st.scene })), id: newId("design"), name: `${st.name} copy`, createdAt: now, updatedAt: now };
@@ -271,17 +251,15 @@ export const useStore = create<State & Actions>()((set, get) => {
       saveDesigns(designs);
       set({ designs });
       if (id === st.currentId) { loadInto(designs[0]); saveCurrentId(designs[0].id); }
-      persistDraft();
     },
     switchDesign(id) {
       const st = get();
       if (id === st.currentId) return;
-      const d = st.designs.find((x) => x.id === id);
+      get().saveCurrent(); // never lose edits of the design we are leaving
+      const d = get().designs.find((x) => x.id === id);
       if (!d) return;
-      // keep unsaved edits of the design we are leaving as its draft
       saveCurrentId(id);
       loadInto(d);
-      persistDraft();
     },
     exportCurrent() {
       const st = get();

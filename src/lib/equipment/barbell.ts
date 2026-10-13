@@ -23,6 +23,7 @@ export interface BarbellConfig {
 
 const finishColor = { chrome: "#d4d4d8", "black-oxide": "#3f3f46", cerakote: "#b91c1c" } as const;
 
+export const FINISH_COLORS = finishColor;
 export const BAR_PRESETS: Record<BarType, Partial<BarbellConfig>> = {
   olympic: { barType: "olympic", overallLength: 2200, shaftDiameter: 28, shaftLength: 1310, sleeveLength: 415, sleeveDiameter: 50, barWeightKg: 20 },
   short: { barType: "short", overallLength: 1500, shaftDiameter: 28, shaftLength: 760, sleeveLength: 370, sleeveDiameter: 50, barWeightKg: 12 },
@@ -103,14 +104,14 @@ export const barbellDef: EquipmentDef<BarbellConfig> = {
   presets: (Object.keys(BAR_PRESETS) as BarType[]).map((k) => ({ id: k, label: { olympic: "Olympic bar", short: "Short bar", "ez-curl": "EZ curl bar", trap: "Trap bar" }[k], config: BAR_PRESETS[k] })),
   fields: [
     { key: "barType", kind: "select", label: "Bar type", options: [{ value: "olympic", label: "Olympic" }, { value: "short", label: "Short" }, { value: "ez-curl", label: "EZ curl" }, { value: "trap", label: "Trap bar" }] },
-    { key: "overallLength", kind: "length", label: "Overall length", group: "Dimensions", min: 300, max: 3000 },
-    { key: "shaftLength", kind: "length", label: "Shaft length", group: "Dimensions", min: 100, max: 3000 },
-    { key: "shaftDiameter", kind: "length", label: "Shaft diameter", group: "Dimensions", min: 10, max: 60 },
-    { key: "sleeveLength", kind: "length", label: "Sleeve length", group: "Dimensions", min: 50, max: 800 },
-    { key: "sleeveDiameter", kind: "length", label: "Sleeve diameter", group: "Dimensions", min: 20, max: 100 },
-    { key: "frameWidth", kind: "length", label: "Trap bar frame width", group: "Dimensions" },
-    { key: "barWeightKg", kind: "number", label: "Bar weight", suffix: "kg", min: 0, max: 100 },
-    { key: "finish", kind: "select", label: "Finish", options: [{ value: "chrome", label: "Chrome" }, { value: "black-oxide", label: "Black oxide" }, { value: "cerakote", label: "Cerakote red" }] },
+    { key: "overallLength", kind: "length", label: "Overall length", min: 300, max: 3000 },
+    { key: "barWeightKg", kind: "number", label: "Bar weight", suffix: "kg", min: 0, max: 100, advanced: true },
+    { key: "finish", kind: "select", label: "Finish", advanced: true, options: [{ value: "chrome", label: "Chrome" }, { value: "black-oxide", label: "Black oxide" }, { value: "cerakote", label: "Cerakote red" }] },
+    { key: "shaftLength", kind: "length", label: "Shaft length", group: "Dimensions", advanced: true, min: 100, max: 3000 },
+    { key: "shaftDiameter", kind: "length", label: "Shaft diameter", group: "Dimensions", advanced: true, min: 10, max: 60 },
+    { key: "sleeveLength", kind: "length", label: "Sleeve length", group: "Dimensions", advanced: true, min: 50, max: 800 },
+    { key: "sleeveDiameter", kind: "length", label: "Sleeve diameter", group: "Dimensions", advanced: true, min: 20, max: 100 },
+    { key: "frameWidth", kind: "length", label: "Frame width", group: "Dimensions", advanced: true, showIf: (c: BarbellConfig) => c.barType === "trap" },
   ],
   validate: (c) => {
     const e: string[] = [];

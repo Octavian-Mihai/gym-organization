@@ -19,7 +19,7 @@ const sizeFields: FieldDef[] = [
   { key: "width", kind: "length", label: "Width", min: 50, max: 5000 },
   { key: "depth", kind: "length", label: "Depth", min: 50, max: 5000 },
   { key: "height", kind: "length", label: "Height", min: 20, max: 4000 },
-  { key: "color", kind: "color", label: "Color" },
+  { key: "color", kind: "color", label: "Color", advanced: true },
 ];
 
 function makeDef(opts: {

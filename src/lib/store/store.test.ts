@@ -31,15 +31,22 @@ describe("store", () => {
     expect(s().scene.equipment).toHaveLength(1);
   });
 
-  it("saves, edits, reverts and reloads", () => {
+  it("switching designs never loses edits (autosave flush)", () => {
+    const first = s().currentId;
     s().addEquipment("barbell");
-    s().saveCurrent();
-    s().addEquipment("power-rack");
-    expect(s().scene.equipment).toHaveLength(2);
-    s().revert();
+    s().newDesign("Other");
+    s().switchDesign(first);
     expect(s().scene.equipment).toHaveLength(1);
     const stored = JSON.parse(localStorage.getItem("homegym:v1:designs")!);
-    expect(stored.find((d: { name: string }) => d.name === "Test").scene.equipment).toHaveLength(1);
+    expect(stored.find((d: { id: string }) => d.id === first).scene.equipment).toHaveLength(1);
+  });
+
+  it("autosaves shortly after an edit", async () => {
+    s().addEquipment("power-rack");
+    await new Promise((r) => setTimeout(r, 700));
+    const stored = JSON.parse(localStorage.getItem("homegym:v1:designs")!);
+    expect(stored.find((d: { id: string }) => d.id === s().currentId).scene.equipment).toHaveLength(1);
+    expect(s().scene).toBe(s().savedScene);
   });
 
   it("duplicates a design independently", () => {
@@ -47,7 +54,7 @@ describe("store", () => {
     s().duplicateDesign();
     s().addEquipment("barbell");
     const orig = s().designs.find((d) => d.name === "Test")!;
-    expect(orig.scene.equipment.length).toBe(0); // saved copy unaffected
+    expect(orig.scene.equipment.length).toBe(1); // the original keeps its own contents
     expect(s().designs.length).toBeGreaterThanOrEqual(3);
   });
 
