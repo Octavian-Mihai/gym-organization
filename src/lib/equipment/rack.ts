@@ -254,7 +254,8 @@ export function buildRack(c: RackConfig): Model {
     }
   }
 
-  return normalizeModel({ primitives: prims, holes });
+  // Rack coordinates have y=0 at the front posts; the object frame has the front facing +y.
+  return normalizeModel({ primitives: prims, holes }, { flipY: true });
 }
 
 export const rackDef: EquipmentDef<RackConfig> = {

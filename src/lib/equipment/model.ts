@@ -1,7 +1,7 @@
 import type { HoleSet, Model, Primitive } from "./types";
 
 /** Re-center a model so the XY bounding box center is (0,0) and the lowest z is 0 (unless keepZ). */
-export function normalizeModel(m: Model, opts: { keepZ?: boolean } = {}): Model {
+export function normalizeModel(m: Model, opts: { keepZ?: boolean; flipY?: boolean } = {}): Model {
   if (m.primitives.length === 0) return m;
   let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity, minZ = Infinity;
   for (const p of m.primitives) {
@@ -15,11 +15,12 @@ export function normalizeModel(m: Model, opts: { keepZ?: boolean } = {}): Model 
   const dx = -(minX + maxX) / 2;
   const dy = -(minY + maxY) / 2;
   const dz = opts.keepZ ? 0 : -minZ;
+  const fy = opts.flipY ? -1 : 1;
   return {
-    primitives: m.primitives.map((p) => ({ ...p, center: [p.center[0] + dx, p.center[1] + dy, p.center[2] + dz] })),
+    primitives: m.primitives.map((p) => ({ ...p, center: [p.center[0] + dx, fy * (p.center[1] + dy), p.center[2] + dz] })),
     holes: m.holes.map((h) => ({
       ...h,
-      center: [h.center[0] + dx, h.center[1] + dy],
+      center: [h.center[0] + dx, fy * (h.center[1] + dy)],
       zs: h.zs.map((z) => z + dz),
       xs: h.xs?.map((x) => x + dx),
     })),
