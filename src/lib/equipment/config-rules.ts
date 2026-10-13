@@ -12,6 +12,11 @@ export function normalizeConfigPatch(type: string, config: Record<string, unknow
   if (type === "power-rack") {
     if ("uprightProfile" in patch && patch.uprightProfile !== "custom") out.uprightSize = PROFILE_SIZES[String(patch.uprightProfile)] ?? config.uprightSize;
     else if ("uprightSize" in patch && !("uprightProfile" in patch)) out.uprightProfile = "custom";
+    // keep pull-up bars at the same relative depth when the rack depth changes
+    if ("depth" in patch && Array.isArray(config.pullupBars) && Number(config.depth) > 0) {
+      const k = Number(patch.depth) / Number(config.depth);
+      out.pullupBars = (config.pullupBars as { at: number }[]).map((b) => ({ ...b, at: b.at * k }));
+    }
     if ("holeSize" in patch && patch.holeSize !== "custom") out.holeDiameter = patch.holeSize === "1" ? fromInches(1) : fromInches(5 / 8);
     else if ("holeDiameter" in patch && !("holeSize" in patch)) out.holeSize = "custom";
   }

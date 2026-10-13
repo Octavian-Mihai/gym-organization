@@ -12,6 +12,10 @@ export interface Crossmember {
   at: number;
   /** override automatic length (mm); undefined = span between posts */
   length?: number;
+  /** which frame edge `at` is measured from: "start" = front (x-axis members) / left (y-axis), "end" = rear / right. Keeps the member on the frame when width/depth change. */
+  anchor?: "start" | "end";
+  /** whether `z` is measured up from the floor or down from the top of the uprights */
+  zAnchor?: "bottom" | "top";
 }
 export interface PullupBar {
   id: string;
@@ -19,6 +23,7 @@ export interface PullupBar {
   at: number;
   z: number;
   diameter: number;
+  zAnchor?: "bottom" | "top";
 }
 export interface Safety {
   id: string;
@@ -101,13 +106,13 @@ export function defaultRack(): RackConfig {
     crossmemberWidth: fromInches(3),
     crossmemberHeight: fromInches(2),
     crossmembers: [
-      { id: id("cm"), axis: "x", z: H - fromInches(1.5), at: 0 },
-      { id: id("cm"), axis: "x", z: H - fromInches(1.5), at: fromInches(49) - fromInches(3) },
-      { id: id("cm"), axis: "y", z: H - fromInches(1.5), at: 0 },
-      { id: id("cm"), axis: "y", z: H - fromInches(1.5), at: fromInches(49) - fromInches(3) },
-      { id: id("cm"), axis: "x", z: fromInches(1.5), at: fromInches(49) - fromInches(3) },
+      { id: id("cm"), axis: "x", z: fromInches(1.5), zAnchor: "top", at: 0, anchor: "start" },
+      { id: id("cm"), axis: "x", z: fromInches(1.5), zAnchor: "top", at: 0, anchor: "end" },
+      { id: id("cm"), axis: "y", z: fromInches(1.5), zAnchor: "top", at: 0, anchor: "start" },
+      { id: id("cm"), axis: "y", z: fromInches(1.5), zAnchor: "top", at: 0, anchor: "end" },
+      { id: id("cm"), axis: "x", z: fromInches(1.5), zAnchor: "bottom", at: 0, anchor: "end" },
     ],
-    pullupBars: [{ id: id("pu"), at: fromInches(49) / 2, z: H - fromInches(4), diameter: fromInches(1.25) }],
+    pullupBars: [{ id: id("pu"), at: fromInches(49) / 2, z: fromInches(4), zAnchor: "top", diameter: fromInches(1.25) }],
     safeties: [{ id: id("sf"), z: fromInches(26), kind: "pin-pipe", reach: fromInches(2) }],
     jcups: [{ id: id("jc"), z: fromInches(50) }],
     pegCount: 0,
@@ -146,6 +151,20 @@ export function validateRack(c: RackConfig): string[] {
   return e;
 }
 
+/** Older designs stored absolute positions; convert them to frame-relative ones so edits to width/depth/height carry them along. */
+function migrateMember(m: Crossmember, c: RackConfig): Crossmember {
+  if (m.anchor && m.zAnchor) return m;
+  const span = m.axis === "x" ? c.depth : c.width;
+  const cw = c.crossmemberWidth ?? 76.2;
+  const atEnd = m.at > span / 2 - cw / 2;
+  const top = m.z > c.uprightHeight / 2;
+  return { ...m, anchor: atEnd ? "end" : "start", at: Math.max(0, atEnd ? span - m.at - cw : m.at), zAnchor: top ? "top" : "bottom", z: Math.max(0, top ? c.uprightHeight - m.z : m.z) };
+}
+function migrateBar(b: PullupBar, c: RackConfig): PullupBar {
+  if (b.zAnchor) return b;
+  return { ...b, zAnchor: "top", z: Math.max(0, c.uprightHeight - b.z) };
+}
+
 export function sanitizeRack(c: RackConfig): RackConfig {
   const d = defaultRack();
   const num = (v: unknown, fb: number, min: number, max = 1e6) => (typeof v === "number" && isFinite(v) ? Math.min(max, Math.max(min, v)) : fb);
@@ -161,8 +180,8 @@ export function sanitizeRack(c: RackConfig): RackConfig {
     rearStorageDepth: num(c.rearStorageDepth, d.rearStorageDepth, 100, 3000),
     holeDiameter: num(c.holeDiameter, d.holeDiameter, 3, 100),
     holeSpacing: num(c.holeSpacing, d.holeSpacing, 5, 500),
-    crossmembers: Array.isArray(c.crossmembers) ? c.crossmembers : d.crossmembers,
-    pullupBars: Array.isArray(c.pullupBars) ? c.pullupBars : d.pullupBars,
+    crossmembers: Array.isArray(c.crossmembers) ? c.crossmembers.map((m) => migrateMember(m, c)) : d.crossmembers,
+    pullupBars: Array.isArray(c.pullupBars) ? c.pullupBars.map((b) => migrateBar(b, c)) : d.pullupBars,
     safeties: Array.isArray(c.safeties) ? c.safeties : d.safeties,
     jcups: Array.isArray(c.jcups) ? c.jcups : d.jcups,
   };
@@ -208,20 +227,23 @@ export function buildRack(c: RackConfig): Model {
   const rearFace = c.depth - s;
   const total = rackTotalDepth(c);
 
+  const zOf = (z: number, a?: "bottom" | "top") => Math.min(c.uprightHeight, Math.max(0, a === "top" ? c.uprightHeight - z : z));
   for (const m of c.crossmembers) {
+    const z = zOf(m.z, m.zAnchor);
+    const span = m.axis === "x" ? c.depth : c.width;
+    const pos = Math.min(span - c.crossmemberWidth, Math.max(0, m.anchor === "end" ? span - m.at - c.crossmemberWidth : m.at));
     if (m.axis === "x") {
       const len = m.length ?? innerRight - innerLeft;
-      prims.push(box(m.id, "crossmember", c.width / 2, m.at + c.crossmemberWidth / 2, m.z, len, c.crossmemberWidth, c.crossmemberHeight, steel));
+      prims.push(box(m.id, "crossmember", c.width / 2, pos + c.crossmemberWidth / 2, z, len, c.crossmemberWidth, c.crossmemberHeight, steel));
     } else {
-      const defLen = c.postCount === 6 ? total - 2 * s : rearFace - frontFace;
       const len = m.length ?? (rearFace - frontFace);
-      void defLen;
-      prims.push(box(m.id, "crossmember", m.at + c.crossmemberWidth / 2, frontFace + len / 2, m.z, c.crossmemberWidth, len, c.crossmemberHeight, steel));
+      prims.push(box(m.id, "crossmember", pos + c.crossmemberWidth / 2, frontFace + len / 2, z, c.crossmemberWidth, len, c.crossmemberHeight, steel));
     }
   }
 
   for (const b of c.pullupBars) {
-    prims.push(cyl(b.id, "pullup", "x", c.width / 2, b.at + s / 2, b.z, b.diameter, c.width - 2 * s + 2, { color: "#d1d5db", material: "chrome" }));
+    const by = Math.min(c.depth - s, Math.max(s, b.at)) ;
+    prims.push(cyl(b.id, "pullup", "x", c.width / 2, by + s / 2 - s / 2, zOf(b.z, b.zAnchor), b.diameter, c.width - 2 * s + 2, { color: "#d1d5db", material: "chrome" }));
   }
 
   for (const sf of c.safeties) {
@@ -231,13 +253,13 @@ export function buildRack(c: RackConfig): Model {
       const endY = sf.kind === "spotter-arm" ? s / 2 - sf.reach : c.depth - s / 2 + 0;
       const lenY = Math.abs(endY - startY) + (sf.kind === "pin-pipe" ? sf.reach : 0);
       const cy = sf.kind === "spotter-arm" ? (startY + endY) / 2 : s / 2 - sf.reach + lenY / 2;
-      prims.push(cyl(`${sf.id}-${xi}`, sf.kind === "pin-pipe" ? "safety-pipe" : "spotter-arm", "y", x, cy, sf.z, d, lenY, { color: "#ef4444", material: "steel" }));
+      prims.push(cyl(`${sf.id}-${xi}`, sf.kind === "pin-pipe" ? "safety-pipe" : "spotter-arm", "y", x, cy, Math.min(sf.z, c.uprightHeight), d, lenY, { color: "#ef4444", material: "steel" }));
     }
   }
 
   for (const jc of c.jcups) {
     for (const [xi, x] of [innerLeft + 15, innerRight - 15].entries()) {
-      prims.push(box(`${jc.id}-${xi}`, "jcup", x, s / 2 - 40, jc.z, 30, 60, 60, { color: "#f59e0b", material: "plastic" }));
+      prims.push(box(`${jc.id}-${xi}`, "jcup", x, s / 2 - 40, Math.min(jc.z, c.uprightHeight), 30, 60, 60, { color: "#f59e0b", material: "plastic" }));
     }
   }
 

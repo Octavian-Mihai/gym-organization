@@ -5,7 +5,7 @@ import type { Model } from "./types";
 
 /** Bounds of the structural frame only (uprights), excluding J-cups/pegs that protrude. */
 const frame = (m: Model) => modelBounds({ ...m, primitives: m.primitives.filter((p) => p.role === "upright") });
-import { buildRack, defaultRack, holePositions, validateRack } from "./rack";
+import { buildRack, defaultRack, holePositions, sanitizeRack, validateRack } from "./rack";
 
 const uprights = (c = defaultRack()) => buildRack(c).primitives.filter((p) => p.role === "upright");
 
@@ -44,5 +44,24 @@ describe("power rack", () => {
   it("validates oversize holes", () => {
     expect(validateRack({ ...defaultRack(), holeDiameter: 80 }).length).toBeGreaterThan(0);
     expect(validateRack(defaultRack())).toHaveLength(0);
+  });
+
+  it("crossmembers and pull-up bar follow the frame when depth, width and height change", () => {
+    const base = defaultRack();
+    const c = { ...base, depth: fromInches(42), width: fromInches(48), uprightHeight: fromInches(80) };
+    const m = buildRack(c);
+    const f = frame(m);
+    expect(f.depth).toBeCloseTo(fromInches(42), 3);
+    // nothing structural may stick out of the frame (J-cups excepted)
+    const structural = modelBounds({ ...m, primitives: m.primitives.filter((p) => !["jcup", "safety-pipe"].includes(p.role)) });
+    expect(structural.depth).toBeCloseTo(f.depth, 3);
+    expect(structural.width).toBeCloseTo(f.width, 3);
+    expect(structural.height).toBeCloseTo(fromInches(80), 3); // top rails moved down with the uprights
+  });
+  it("migrates legacy absolute-position members", () => {
+    const legacy = { ...defaultRack(), crossmembers: [{ id: "x", axis: "x" as const, z: fromInches(88.5), at: fromInches(46) }] };
+    const out = sanitizeRack(legacy);
+    expect(out.crossmembers[0].anchor).toBe("end");
+    expect(out.crossmembers[0].zAnchor).toBe("top");
   });
 });

@@ -140,23 +140,26 @@ function RackExtras({ inst, patch }: { inst: EquipmentInstance; patch: (p: Recor
     <details className="rounded border border-zinc-200 p-2 dark:border-zinc-800">
       <summary className="cursor-pointer select-none text-[10px] font-semibold uppercase tracking-wide text-zinc-500">Crossmembers, pull-up bars, safeties, J-cups</summary>
       <div className="mt-2 space-y-1.5">
-      <ListHeader title={`Crossmembers (${c.crossmembers.length})`} onAdd={() => patch({ crossmembers: [...c.crossmembers, { id: newId("cm"), axis: "x", z: c.uprightHeight / 2, at: 0 }] })} />
+      <ListHeader title={`Crossmembers (${c.crossmembers.length})`} onAdd={() => patch({ crossmembers: [...c.crossmembers, { id: newId("cm"), axis: "x", z: c.uprightHeight / 2, zAnchor: "bottom", at: 0, anchor: "start" }] })} />
       {c.crossmembers.map((m, i) => (
         <div key={m.id} className="space-y-1 rounded border border-zinc-200 p-1.5 dark:border-zinc-800">
           <div className="flex gap-1">
             <select className="rounded border border-zinc-300 bg-transparent text-xs dark:border-zinc-700" value={m.axis} onChange={(e) => upd("crossmembers", i, { axis: e.target.value as "x" | "y" })}><option value="x">Across width</option><option value="y">Front-to-back</option></select>
             <button className={`${rm} ml-auto`} onClick={() => del("crossmembers", i)}>Remove</button>
           </div>
-          <LengthField label="Height (z)" value={m.z} onChange={(z) => upd("crossmembers", i, { z })} />
-          <LengthField label={m.axis === "x" ? "Position (depth)" : "Position (width)"} value={m.at} onChange={(at) => upd("crossmembers", i, { at })} />
+          <SelectField label="Measured from" value={m.anchor ?? "start"} options={m.axis === "x" ? [{ value: "start", label: "Front edge" }, { value: "end", label: "Rear edge" }] : [{ value: "start", label: "Left edge" }, { value: "end", label: "Right edge" }]} onChange={(anchor) => upd("crossmembers", i, { anchor: anchor as "start" | "end" })} />
+          <LengthField label="Distance" value={m.at} min={0} onChange={(at) => upd("crossmembers", i, { at })} />
+          <SelectField label="Height from" value={m.zAnchor ?? "bottom"} options={[{ value: "bottom", label: "Floor" }, { value: "top", label: "Top of uprights" }]} onChange={(zAnchor) => upd("crossmembers", i, { zAnchor: zAnchor as "bottom" | "top" })} />
+          <LengthField label="Height" value={m.z} min={0} onChange={(z) => upd("crossmembers", i, { z })} />
           <LengthField label="Length override" value={m.length ?? 0} min={0} hint="0 = automatic span between posts" onChange={(len) => upd("crossmembers", i, { length: len > 0 ? len : undefined })} />
         </div>
       ))}
-      <ListHeader title={`Pull-up bars (${c.pullupBars.length})`} onAdd={() => patch({ pullupBars: [...c.pullupBars, { id: newId("pu"), at: c.depth / 2, z: c.uprightHeight - fromInches(4), diameter: fromInches(1.25) }] })} />
+      <ListHeader title={`Pull-up bars (${c.pullupBars.length})`} onAdd={() => patch({ pullupBars: [...c.pullupBars, { id: newId("pu"), at: c.depth / 2, z: fromInches(4), zAnchor: "top", diameter: fromInches(1.25) }] })} />
       {c.pullupBars.map((b, i) => (
         <div key={b.id} className="space-y-1 rounded border border-zinc-200 p-1.5 dark:border-zinc-800">
           <LengthField label="Position (depth)" value={b.at} onChange={(at) => upd("pullupBars", i, { at })} />
-          <LengthField label="Height (z)" value={b.z} onChange={(z) => upd("pullupBars", i, { z })} />
+          <SelectField label="Height from" value={b.zAnchor ?? "top"} options={[{ value: "bottom", label: "Floor" }, { value: "top", label: "Top of uprights" }]} onChange={(zAnchor) => upd("pullupBars", i, { zAnchor: zAnchor as "bottom" | "top" })} />
+          <LengthField label="Height" value={b.z} min={0} onChange={(z) => upd("pullupBars", i, { z })} />
           <LengthField label="Diameter" value={b.diameter} onChange={(diameter) => upd("pullupBars", i, { diameter })} />
           <button className={rm} onClick={() => del("pullupBars", i)}>Remove</button>
         </div>
