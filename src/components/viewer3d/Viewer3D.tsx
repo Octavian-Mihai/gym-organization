@@ -357,7 +357,7 @@ export function Viewer3D({ active = true }: { active?: boolean }) {
 
   return (
     <div className="relative h-full w-full bg-gradient-to-b from-zinc-200 to-zinc-100 dark:from-zinc-900 dark:to-zinc-950">
-      <Canvas shadows dpr={[1, 2]} frameloop={active ? "always" : "never"} gl={{ preserveDrawingBuffer: true, antialias: true }}>
+      <Canvas shadows="percentage" dpr={[1, 2]} frameloop={active ? "always" : "never"} gl={{ preserveDrawingBuffer: true, antialias: true }}>
         <Scene3D issues={issues} />
         <LabelProjector labels={labelsRef} els={els} />
       </Canvas>
