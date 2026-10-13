@@ -127,7 +127,8 @@ export function defaultRack(): RackConfig {
 }
 
 /** Standard hole z positions along an upright, honoring an optional close-spaced bench zone. */
-export function holePositions(c: RackConfig): number[] {
+export type HoleLayout = Pick<RackConfig, "uprightHeight" | "uprightSize" | "holeSpacing" | "holeDiameter" | "holeStartZ" | "westsideBench" | "westsideFrom" | "westsideTo" | "westsideSpacing">;
+export function holePositions(c: HoleLayout): number[] {
   const zs: number[] = [];
   const top = c.uprightHeight - c.uprightSize * 0.5;
   const spacing = Math.max(c.holeSpacing, c.holeDiameter * 1.5, 5);

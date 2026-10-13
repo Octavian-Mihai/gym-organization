@@ -145,6 +145,7 @@ export function resizePatch(inst: EquipmentInstance, dW: number, dD: number): Re
   const c = inst.config as Record<string, number>;
   switch (inst.type) {
     case "power-rack": return { width: c.width + dW, depth: c.depth + dD };
+    case "uprights": return dW ? { crossmemberLength: c.crossmemberLength + dW } : null;
     case "stall-mat": return { length: c.length + dW, width: c.width + dD };
     case "barbell": return dW ? { shaftLength: c.shaftLength + dW } : null;
     case "pegboard": return dW ? { width: c.width + dW } : null;

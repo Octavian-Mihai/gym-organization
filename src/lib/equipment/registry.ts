@@ -3,12 +3,13 @@ import { ITEM_DEFS } from "./items";
 import { matDef } from "./mat";
 import { pegboardDef } from "./pegboard";
 import { rackDef } from "./rack";
+import { uprightsDef } from "./uprights";
 import type { EquipmentDef } from "./types";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyDef = EquipmentDef<any>;
 
-const defs: AnyDef[] = [rackDef, matDef, barbellDef, pegboardDef, ...ITEM_DEFS];
+const defs: AnyDef[] = [rackDef, uprightsDef, matDef, barbellDef, pegboardDef, ...ITEM_DEFS];
 const map = new Map<string, AnyDef>(defs.map((d) => [d.type, d]));
 
 /** Register additional equipment without modifying the application: registerEquipment(myDef). */

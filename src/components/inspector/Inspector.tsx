@@ -5,6 +5,7 @@ import { newPlateGroup } from "@/lib/equipment/barbell";
 import { ACCESSORY_DIMS, newAccessory, pegGrid, type AccessoryKind, type PegboardConfig } from "@/lib/equipment/pegboard";
 import { PLATE_PRESETS, groupsWeight, kgToLbStr, plateLabel, type PlateGroup } from "@/lib/equipment/plates";
 import type { RackConfig } from "@/lib/equipment/rack";
+import type { UprightsConfig } from "@/lib/equipment/uprights";
 import { dimsOf, worldPlacement } from "@/lib/geometry/world";
 import { issuesFor, validateSceneCached } from "@/lib/geometry/validation";
 import { normalizeConfigPatch } from "@/lib/equipment/config-rules";
@@ -33,7 +34,12 @@ export function Inspector({ inst }: { inst: EquipmentInstance }) {
   const issues = useMemo(() => issuesFor(validateSceneCached(scene), inst.id), [scene, inst.id]);
   const problems = def ? def.validate(inst.config) : [];
   const meta = def?.metadata?.(inst.config) ?? [];
-  const patchConfig = (p: Record<string, unknown>) => commit((s) => updateConfig(s, inst.id, normalizeConfigPatch(inst.type, inst.config as Record<string, unknown>, p)));
+  const patchConfig = (p: Record<string, unknown>) => commit((s) => {
+    let next = updateConfig(s, inst.id, normalizeConfigPatch(inst.type, inst.config as Record<string, unknown>, p));
+    // keep an untouched default name in step with the pair/single switch
+    if (inst.type === "uprights" && "count" in p && ["Upright pair", "Upright"].includes(inst.name)) next = updateInstance(next, inst.id, { name: p.count === 1 ? "Upright" : "Upright pair" });
+    return next;
+  });
   const patchPlace = (p: Partial<EquipmentInstance["placement"]>) => commit((s) => updatePlacement(s, inst.id, p));
   const patchInst = (p: Partial<EquipmentInstance>) => commit((s) => updateInstance(s, inst.id, p));
   const mountTargets = scene.equipment.filter((e) => e.id !== inst.id && !e.parentId && e.type !== "stall-mat");
@@ -102,6 +108,7 @@ export function Inspector({ inst }: { inst: EquipmentInstance }) {
         </Section>
       )}
 
+      {inst.type === "uprights" && <UprightCrossmembers inst={inst} patch={patchConfig} />}
       {inst.type === "barbell" && <PlatesEditor inst={inst} patch={patchConfig} />}
       {inst.type === "pegboard" && <PegAccessories inst={inst} patch={patchConfig} />}
 
@@ -124,6 +131,23 @@ export function Inspector({ inst }: { inst: EquipmentInstance }) {
         </div>
       </details>
     </div>
+  );
+}
+
+function UprightCrossmembers({ inst, patch }: { inst: EquipmentInstance; patch: (p: Record<string, unknown>) => void }) {
+  const c = inst.config as unknown as UprightsConfig;
+  const upd = (i: number, p: object) => patch({ crossmembers: c.crossmembers.map((m, j) => (j === i ? { ...m, ...p } : m)) });
+  return (
+    <Section title={`Crossmembers (${c.crossmembers.length})`}>
+      {c.crossmembers.map((m, i) => (
+        <div key={m.id} className="space-y-1 rounded border border-zinc-200 p-1.5 dark:border-zinc-800">
+          <SelectField label="Height from" value={m.zAnchor ?? "bottom"} options={[{ value: "bottom", label: "Floor" }, { value: "top", label: "Top of upright" }]} onChange={(zAnchor) => upd(i, { zAnchor })} />
+          <LengthField label="Height" value={m.z} min={0} max={c.uprightHeight} onChange={(z) => upd(i, { z })} />
+          <button className="text-xs text-red-600 hover:underline" onClick={() => patch({ crossmembers: c.crossmembers.filter((_, j) => j !== i) })}>Remove</button>
+        </div>
+      ))}
+      <button className={smallBtn} onClick={() => patch({ crossmembers: [...c.crossmembers, { id: newId("ucm"), z: c.uprightHeight / 2, zAnchor: "bottom" }] })}>+ Add crossmember</button>
+    </Section>
   );
 }
 

@@ -9,11 +9,11 @@ import { PROFILE_SIZES } from "./rack";
  */
 export function normalizeConfigPatch(type: string, config: Record<string, unknown>, patch: Record<string, unknown>): Record<string, unknown> {
   const out = { ...patch };
-  if (type === "power-rack") {
+  if (type === "power-rack" || type === "uprights") {
     if ("uprightProfile" in patch && patch.uprightProfile !== "custom") out.uprightSize = PROFILE_SIZES[String(patch.uprightProfile)] ?? config.uprightSize;
     else if ("uprightSize" in patch && !("uprightProfile" in patch)) out.uprightProfile = "custom";
     // keep pull-up bars at the same relative depth when the rack depth changes
-    if ("depth" in patch && Array.isArray(config.pullupBars) && Number(config.depth) > 0) {
+    if (type === "power-rack" && "depth" in patch && Array.isArray(config.pullupBars) && Number(config.depth) > 0) {
       const k = Number(patch.depth) / Number(config.depth);
       out.pullupBars = (config.pullupBars as { at: number }[]).map((b) => ({ ...b, at: b.at * k }));
     }
