@@ -144,6 +144,27 @@ function Wall({ room, wall, vis }: { room: Room; wall: WallId; vis: "auto" | "vi
   );
 }
 
+/** Floor grid lines every foot, clipped exactly to the room rectangle (a square GridHelper spilled outside non-square rooms). */
+function FloorGrid({ room }: { room: Room }) {
+  const geo = useMemo(() => {
+    const step = 304.8;
+    const pts: number[] = [];
+    for (let x = 0; x <= room.length + 0.1; x += step) pts.push(x, 0.5, 0, x, 0.5, room.width);
+    for (let z = 0; z <= room.width + 0.1; z += step) pts.push(0, 0.5, z, room.length, 0.5, z);
+    // close the far edges when the room is not a whole number of feet
+    pts.push(room.length, 0.5, 0, room.length, 0.5, room.width, 0, 0.5, room.width, room.length, 0.5, room.width);
+    const g = new THREE.BufferGeometry();
+    g.setAttribute("position", new THREE.Float32BufferAttribute(pts, 3));
+    return g;
+  }, [room.length, room.width]);
+  useEffect(() => () => geo.dispose(), [geo]);
+  return (
+    <lineSegments geometry={geo} raycast={() => null}>
+      <lineBasicMaterial color="#6b7280" transparent opacity={0.55} />
+    </lineSegments>
+  );
+}
+
 function OpeningFill({ room, o }: { room: Room; o: Opening }) {
   const bottom = o.kind === "window" ? o.sillHeight : 0;
   const mid = o.offset + o.width / 2;
@@ -261,7 +282,7 @@ function Scene3D({ issues }: { issues: Issue[] }) {
         <planeGeometry args={[room.length, room.width]} />
         <meshStandardMaterial color={room.floorColor} roughness={0.95} />
       </mesh>
-      <gridHelper args={[Math.max(room.length, room.width), Math.round(Math.max(room.length, room.width) / 304.8), "#6b7280", "#9ca3af"]} position={[room.length / 2, 0.5, room.width / 2]} />
+      <FloorGrid room={room} />
       {(["north", "east", "south", "west"] as WallId[]).map((w) => <Wall key={w} room={room} wall={w} vis={wallVis[w]} />)}
       {room.obstacles.map((ob) => {
         const horiz = ob.wall === "north" || ob.wall === "south";
